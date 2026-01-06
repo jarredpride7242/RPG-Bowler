@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,8 +53,8 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
     return `Round ${round}`;
   };
   
-  // Get opponent for current match - select based on current round
-  const getOpponent = (): Opponent => {
+  // Memoize opponent to prevent re-renders from triggering new opponent score generation
+  const currentOpponent = useMemo((): Opponent => {
     // Filter out player from entrants
     const opponents = tournament.entrants.filter(e => !e.isPlayer);
     
@@ -100,9 +100,7 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
         revRate: 60, laneReading: 60 + roundBonus, spareShooting: 65 + roundBonus, charisma: 50, reputation: 40,
       },
     };
-  };
-  
-  const currentOpponent = getOpponent();
+  }, [tournament.entrants, currentRound, tierDef.minAverage]);
   
   const tierToCompTier = (tier: string) => {
     switch (tier) {

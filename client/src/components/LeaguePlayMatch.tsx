@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,8 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
   const opponentIndex = (currentWeekNum - 1) % opponentsExcludingPlayer.length;
   const opponentStanding = opponentsExcludingPlayer[opponentIndex];
   
-  const opponent: Opponent = {
+  // Memoize opponent to prevent re-renders from triggering new opponent score generation
+  const opponent = useMemo((): Opponent => ({
     id: opponentStanding?.bowlerId || "opp-1",
     firstName: opponentStanding?.name?.split(" ")[0] || "Opponent",
     lastName: opponentStanding?.name?.split(" ").slice(1).join(" ") || "",
@@ -38,7 +39,7 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
       stamina: 60, mentalToughness: 60, speedControl: 60, equipmentKnowledge: 50,
       revRate: 60, laneReading: 60, spareShooting: 65, charisma: 50, reputation: 40,
     },
-  };
+  }), [opponentStanding?.bowlerId, opponentStanding?.name, opponentStanding?.average]);
   
   const competition: Competition = {
     id: league.id,
