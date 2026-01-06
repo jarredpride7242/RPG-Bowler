@@ -1,18 +1,75 @@
-import { Switch, Route } from "wouter";
+import { useState, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
+import { GameProvider, useGame } from "@/lib/gameContext";
+import { ThemeProvider } from "@/lib/themeContext";
+import { SaveFileManager } from "@/components/SaveFileManager";
+import { NewGameSetup } from "@/components/NewGameSetup";
+import { BottomNav, type TabId } from "@/components/BottomNav";
+import { StatusBar } from "@/components/StatusBar";
+import { HomeScreen } from "@/components/screens/HomeScreen";
+import { BowlScreen } from "@/components/screens/BowlScreen";
+import { CareerScreen } from "@/components/screens/CareerScreen";
+import { ShopScreen } from "@/components/screens/ShopScreen";
+import { ProfileScreen } from "@/components/screens/ProfileScreen";
 
-function Router() {
+function GameContent() {
+  const { isPlaying, currentSlot } = useGame();
+  const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [newGameSlot, setNewGameSlot] = useState<number | null>(null);
+  
+  // Clear newGameSlot when game starts playing
+  useEffect(() => {
+    if (isPlaying && newGameSlot !== null) {
+      setNewGameSlot(null);
+    }
+  }, [isPlaying, newGameSlot]);
+  
+  // Show new game setup if we're creating a new game and not yet playing
+  if (newGameSlot !== null && !isPlaying) {
+    return (
+      <NewGameSetup 
+        slotId={newGameSlot} 
+        onBack={() => setNewGameSlot(null)} 
+      />
+    );
+  }
+  
+  if (!isPlaying) {
+    return (
+      <SaveFileManager 
+        onStartNewGame={(slotId) => setNewGameSlot(slotId)} 
+      />
+    );
+  }
+  
+  const renderScreen = () => {
+    switch (activeTab) {
+      case "home":
+        return <HomeScreen onNavigate={setActiveTab} />;
+      case "bowl":
+        return <BowlScreen />;
+      case "career":
+        return <CareerScreen />;
+      case "shop":
+        return <ShopScreen />;
+      case "profile":
+        return <ProfileScreen />;
+      default:
+        return <HomeScreen onNavigate={setActiveTab} />;
+    }
+  };
+  
   return (
-    <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
-    </Switch>
+    <div className="min-h-screen bg-background">
+      <StatusBar />
+      <main className="max-w-2xl mx-auto">
+        {renderScreen()}
+      </main>
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+    </div>
   );
 }
 
@@ -20,8 +77,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <ThemeProvider>
+          <GameProvider>
+            <GameContent />
+            <Toaster />
+          </GameProvider>
+        </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
