@@ -1253,6 +1253,8 @@ export const playerProfileSchema = z.object({
   activeTournament: activeTournamentSchema.nullable().optional(),
   tournamentHistory: z.array(tournamentResultSchema).optional(),
   leagueChampionships: z.number().optional(),
+  // Bowling alley environment customization
+  alleyEnvironment: alleyEnvironmentSchema.optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
