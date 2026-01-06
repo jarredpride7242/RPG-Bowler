@@ -1,0 +1,247 @@
+Build a mobile-first RPG bowling simulator web app game (HTML, CSS, vanilla JavaScript only; no frameworks), inspired by Rapstar / BasketballAgent–style sports management sims. The game must run well on mobile browsers and be designed to later wrap into a native mobile app. Use localStorage for persistence.
+
+Core Structure
+	•	Single-page app with bottom navigation tabs.
+	•	Files: index.html, style.css, script.js.
+	•	3 separate save files (Save Slot 1, 2, 3) with:
+	•	Create / Load / Overwrite confirmation
+	•	Delete save confirmation
+	•	Each save stores a full independent career.
+
+⸻
+
+New Game Setup
+
+On new save:
+	1.	Prompt for First Name and Last Name
+	2.	Bowling style:
+	•	One-handed
+	•	Two-handed
+	3.	Handedness:
+	•	If one-handed: Left or Right
+	•	If two-handed: Left-dominant or Right-dominant
+	4.	Start as an Amateur bowler (not professional).
+
+⸻
+
+Player Stats & Progression
+
+Stats should include (you may add more if appropriate):
+	•	Throw Power
+	•	Accuracy
+	•	Hook Control
+	•	Rev Rate
+	•	Speed Control
+	•	Consistency
+	•	Spare Shooting
+	•	Mental Toughness
+	•	Lane Reading
+	•	Equipment Knowledge
+	•	Stamina
+	•	Charisma
+	•	Reputation
+
+Stats range roughly 20–99.
+	•	Player gains stats via training, leagues, tournaments, experience.
+	•	Training costs Energy and has diminishing returns.
+	•	Progression should feel slow and realistic.
+
+⸻
+
+Energy System
+	•	Energy (ex: max 100)
+	•	Energy refills partially each week
+	•	Actions cost energy:
+	•	Training
+	•	Bowling games
+	•	Jobs
+	•	Dating/social activities
+	•	Low energy affects bowling performance.
+
+⸻
+
+Time System
+	•	Week-based progression
+	•	Each week:
+	•	Job pay + energy drain
+	•	League/tournament games
+	•	Random events
+	•	Track season number and weekly bowling average trends.
+
+⸻
+
+Bowling Gameplay Simulation (Required)
+
+Implement a frame-by-frame bowling simulation (10 frames, proper 10th frame rules).
+
+Each throw outcome is influenced by:
+	•	Accuracy
+	•	Consistency
+	•	Hook Control
+	•	Rev Rate
+	•	Lane Reading
+	•	Ball attributes
+	•	Oil pattern difficulty
+	•	Mental Toughness (late frames)
+	•	Fatigue / low energy penalties
+
+Simulation outputs:
+	•	Pinfall
+	•	Strikes, spares, opens
+	•	Final game score
+	•	Update career bowling average
+
+Early career averages should be ~120–160.
+Elite players may reach 220–240.
+
+⸻
+
+Lanes & Oil Patterns
+
+Include multiple lane conditions:
+	•	House shot (easy)
+	•	Sport pattern (hard)
+	•	Short oil
+	•	Long oil
+	•	Heavy oil / dry lanes
+
+Lane Reading mitigates difficulty.
+
+⸻
+
+Leagues, Tournaments & Championships
+	•	Local amateur leagues (weekly)
+	•	Amateur tournaments (local / regional)
+	•	Prize money based on performance
+	•	Championships at season end
+
+⸻
+
+Professional Membership System (NEW – IMPORTANT)
+
+Add a “Go Pro” system inspired by USBC professional eligibility:
+	•	Player cannot enter professional tournaments or earn pro-level sponsorships until they:
+	1.	Maintain a bowling average of at least 200 over a meaningful sample size (ex: last 20–30 games).
+	2.	Apply for Professional Membership from a dedicated screen/tab.
+
+Professional Membership Rules
+	•	Show a “Professional Membership” screen:
+	•	Displays current average
+	•	Displays requirement: 200+ average
+	•	If average is below 200:
+	•	Application button is disabled
+	•	Show message explaining requirement
+	•	Once average ≥ 200:
+	•	Player may apply (costs money + energy)
+	•	On approval:
+	•	Player status changes from Amateur → Professional
+	•	Unlock:
+	•	Pro tournaments
+	•	Larger prize pools
+	•	Sponsorship system
+	•	Increased reputation gain
+	•	Once professional:
+	•	Amateur-only events are locked
+	•	Difficulty slightly increases
+	•	Save professional status permanently in the save file.
+
+⸻
+
+Jobs & Economy
+	•	Jobs are contract-based (weeks long)
+	•	Applying for a job costs energy
+	•	Each week:
+	•	Pay is earned
+	•	Energy is drained
+	•	Example:
+	•	Dog-sitting: $330/week, −13 energy/week
+	•	Some jobs require:
+	•	Reputation
+	•	Charisma
+	•	Consistency
+	•	Allow quitting jobs with confirmation.
+
+⸻
+
+Bowling Ball Shop
+	•	Ball types:
+	•	Plastic
+	•	Urethane
+	•	Reactive (solid / pearl / hybrid)
+	•	Core types:
+	•	Symmetric
+	•	Asymmetric
+	•	Attributes:
+	•	Hook potential
+	•	Control
+	•	Backend reaction
+	•	Oil handling
+	•	Forgiveness
+	•	Generate fictional ball names procedurally.
+	•	Allow multiple owned balls and active ball selection.
+	•	Optional pro shop upgrades (surface, drilling).
+
+⸻
+
+Relationships / Dating
+	•	Dating-app-style interface
+	•	Energy + money cost
+	•	Relationship level grants small buffs (mental toughness, energy recovery).
+
+⸻
+
+Properties / Lifestyle
+	•	Rent → upgrade apartments/houses
+	•	Better properties improve energy recovery or training bonuses.
+
+⸻
+
+Sponsors & Reputation
+	•	Sponsors unlock only after going pro
+	•	Contracts require:
+	•	Minimum average
+	•	Reputation maintenance
+	•	Sponsors provide weekly income or bonuses.
+
+⸻
+
+UI Requirements
+	•	Mobile-first
+	•	Large buttons
+	•	Clear stats
+	•	Bottom navigation
+	•	Modals for confirmations (jobs, purchases, pro application).
+
+⸻
+
+Saving Requirements
+
+Each save must store:
+	•	Player profile & pro status
+	•	Stats & progression
+	•	Energy, money, reputation
+	•	Bowling average history
+	•	Inventory (balls)
+	•	League/tournament history
+	•	Job contracts
+	•	Relationships
+	•	Properties
+	•	Week/season state
+
+⸻
+
+Balancing Targets
+	•	Going pro should take time and skill
+	•	200 average should feel like a real achievement
+	•	Professional play is harder and more volatile
+	•	Money is tight early; sustainable later
+
+⸻
+
+Deliverables
+	•	Fully working index.html, style.css, script.js
+	•	Commented bowling simulation logic
+	•	Clear constants at top of script for tuning:
+	•	Difficulty
+	•	Energy drain
+	•	Pro eligibility threshold
