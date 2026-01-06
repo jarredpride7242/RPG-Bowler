@@ -221,6 +221,7 @@ function generateWeeklyEvent(
     choices: selected.choices,
     weekTriggered: profile.currentWeek,
     resolved: false,
+    isMajorEvent: isMajor,
   };
 }
 

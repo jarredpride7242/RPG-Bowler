@@ -14,13 +14,14 @@ import {
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { GAME_CONSTANTS } from "@shared/schema";
+import { WeeklyEventModal, ActiveEffectsPanel } from "@/components/WeeklyEventModal";
 
 interface HomeScreenProps {
   onNavigate: (tab: "bowl" | "career" | "shop" | "profile") => void;
 }
 
 export function HomeScreen({ onNavigate }: HomeScreenProps) {
-  const { currentProfile, advanceWeek, updateStats, useEnergy } = useGame();
+  const { currentProfile, advanceWeek, updateStats, useEnergy, getActiveEventEffects, getCurrentPartner } = useGame();
   
   if (!currentProfile) return null;
   
@@ -42,8 +43,13 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     { stat: "consistency" as const, label: "Consistency", cost: 15, icon: TrendingUp },
     { stat: "throwPower" as const, label: "Power", cost: 20, icon: Dumbbell },
   ];
+  
+  const activeEventEffects = getActiveEventEffects();
+  const partner = getCurrentPartner();
 
   return (
+    <>
+      <WeeklyEventModal />
     <div className="space-y-4 pb-24 px-4 pt-4">
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -245,6 +251,25 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </Button>
         </CardContent>
       </Card>
+      
+      {(activeEventEffects.length > 0 || partner) && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            {partner && (
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant="secondary" className="text-purple-400">
+                  Dating {partner.match.name}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {partner.relationshipLevel}% connection
+                </span>
+              </div>
+            )}
+            <ActiveEffectsPanel />
+          </CardContent>
+        </Card>
+      )}
     </div>
+    </>
   );
 }

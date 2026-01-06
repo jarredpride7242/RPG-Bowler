@@ -234,6 +234,7 @@ export const triggeredEventSchema = z.object({
   weekTriggered: z.number(),
   resolved: z.boolean(),
   choiceMade: z.string().optional(),
+  isMajorEvent: z.boolean().optional(),
 });
 
 export type TriggeredEvent = z.infer<typeof triggeredEventSchema>;
