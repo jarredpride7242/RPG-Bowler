@@ -1,5 +1,7 @@
-import type { BowlingBall, OilPattern, PlayerStats, Sponsor } from "@shared/schema";
-import { oilPatternDifficulty } from "@shared/schema";
+import type { BowlingBall, OilPattern, PlayerStats, Sponsor, Opponent, Competition, BowlingStyle, Handedness } from "@shared/schema";
+import { oilPatternDifficulty, GAME_CONSTANTS } from "@shared/schema";
+
+type CompetitionTier = Competition['tier'];
 
 // ============================================
 // BOWLING SIMULATION UTILITIES
@@ -287,4 +289,181 @@ export function formatSaveDate(dateStr: string | null): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+// ============================================
+// OPPONENT GENERATION
+// ============================================
+
+const FIRST_NAMES = [
+  "Mike", "John", "Chris", "Dave", "Brian", "Steve", "Tom", "Matt", "Dan", "Pete",
+  "Jason", "Ryan", "Kevin", "Eric", "Mark", "Jeff", "Scott", "Tim", "Nick", "Kyle",
+  "Sarah", "Lisa", "Kelly", "Amy", "Michelle", "Karen", "Lauren", "Ashley", "Emily", "Jessica",
+  "Alex", "Jordan", "Casey", "Taylor", "Morgan", "Sam", "Pat", "Drew", "Jamie", "Robin"
+];
+
+const LAST_NAMES = [
+  "Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson",
+  "Martinez", "Anderson", "Taylor", "Thomas", "Hernandez", "Moore", "Martin", "Jackson", "Thompson", "White",
+  "Lopez", "Lee", "Gonzalez", "Harris", "Clark", "Lewis", "Robinson", "Walker", "Perez", "Hall",
+  "Young", "Allen", "Sanchez", "Wright", "King", "Scott", "Green", "Baker", "Adams", "Nelson"
+];
+
+function generateOpponentName(): { firstName: string; lastName: string } {
+  const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+  const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+  return { firstName, lastName };
+}
+
+function generateOpponentStats(tier: CompetitionTier): PlayerStats {
+  const skillRange = GAME_CONSTANTS.OPPONENT_SKILL_BY_TIER[tier] || 
+    GAME_CONSTANTS.OPPONENT_SKILL_BY_TIER["amateur-local"];
+  
+  const { statMin, statMax } = skillRange;
+  
+  const randomStat = () => Math.floor(statMin + Math.random() * (statMax - statMin));
+  
+  return {
+    throwPower: randomStat(),
+    accuracy: randomStat(),
+    hookControl: randomStat(),
+    revRate: randomStat(),
+    speedControl: randomStat(),
+    consistency: randomStat(),
+    spareShooting: randomStat(),
+    mentalToughness: randomStat(),
+    laneReading: randomStat(),
+    equipmentKnowledge: randomStat(),
+    stamina: randomStat(),
+    charisma: randomStat(),
+    reputation: Math.floor(Math.random() * 50),
+  };
+}
+
+function generateOpponentAverage(tier: CompetitionTier): number {
+  const skillRange = GAME_CONSTANTS.OPPONENT_SKILL_BY_TIER[tier] || 
+    GAME_CONSTANTS.OPPONENT_SKILL_BY_TIER["amateur-local"];
+  
+  const { avgMin, avgMax } = skillRange;
+  return Math.floor(avgMin + Math.random() * (avgMax - avgMin));
+}
+
+export function generateOpponent(tier: CompetitionTier): Opponent {
+  const { firstName, lastName } = generateOpponentName();
+  const styles: BowlingStyle[] = ["one-handed", "two-handed"];
+  const hands: Handedness[] = ["left", "right"];
+  
+  return {
+    id: `opp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    firstName,
+    lastName,
+    bowlingStyle: styles[Math.floor(Math.random() * styles.length)],
+    handedness: hands[Math.floor(Math.random() * hands.length)],
+    stats: generateOpponentStats(tier),
+    bowlingAverage: generateOpponentAverage(tier),
+    currentSeriesScore: 0,
+    gamesPlayed: 0,
+  };
+}
+
+export function generateOpponents(count: number, tier: CompetitionTier): Opponent[] {
+  const usedNames = new Set<string>();
+  const opponents: Opponent[] = [];
+  
+  while (opponents.length < count) {
+    const opponent = generateOpponent(tier);
+    const fullName = `${opponent.firstName} ${opponent.lastName}`;
+    
+    if (!usedNames.has(fullName)) {
+      usedNames.add(fullName);
+      opponents.push(opponent);
+    }
+  }
+  
+  return opponents;
+}
+
+// ============================================
+// OPPONENT GAME SIMULATION
+// ============================================
+
+export function simulateOpponentGame(
+  opponent: Opponent,
+  oilPattern: OilPattern
+): number {
+  const oilDiff = oilPatternDifficulty[oilPattern];
+  
+  // Base score from opponent average with variance
+  const baseScore = opponent.bowlingAverage;
+  const variance = GAME_CONSTANTS.UPSET_FACTOR * 40; // +/- range
+  const oilPenalty = (oilDiff - 1) * 5;
+  
+  const score = baseScore + (Math.random() - 0.5) * variance * 2 - oilPenalty;
+  return Math.round(Math.max(80, Math.min(300, score)));
+}
+
+// Create a default ball for opponents to use in simulation
+function getDefaultOpponentBall(): BowlingBall {
+  return {
+    id: "opponent-ball",
+    name: "Opponent Ball",
+    type: "reactive-solid",
+    coreType: "symmetric",
+    hookPotential: 5,
+    control: 5,
+    backendReaction: 5,
+    oilHandling: 5,
+    forgiveness: 5,
+    price: 0,
+    owned: true,
+  };
+}
+
+export function simulateOpponentGameFrameByFrame(
+  opponent: Opponent,
+  oilPattern: OilPattern
+): { frames: Array<{ throw1: number; throw2?: number; throw3?: number; isStrike: boolean; isSpare: boolean }>; score: number } {
+  const frames: Array<{ throw1: number; throw2?: number; throw3?: number; isStrike: boolean; isSpare: boolean }> = [];
+  const ball = getDefaultOpponentBall();
+  
+  for (let frameNum = 1; frameNum <= 10; frameNum++) {
+    const isTenthFrame = frameNum === 10;
+    let pinsRemaining = 10;
+    
+    // First throw
+    const throw1 = simulateThrow(pinsRemaining, false, opponent.stats, ball, oilPattern, frameNum, 100);
+    pinsRemaining -= throw1;
+    
+    if (isTenthFrame) {
+      if (throw1 === 10) {
+        // Strike in 10th - get 2 more throws
+        pinsRemaining = 10;
+        const throw2 = simulateThrow(pinsRemaining, false, opponent.stats, ball, oilPattern, frameNum, 100);
+        pinsRemaining = throw2 === 10 ? 10 : 10 - throw2;
+        const throw3 = simulateThrow(pinsRemaining, throw2 !== 10, opponent.stats, ball, oilPattern, frameNum, 100);
+        frames.push({ throw1, throw2, throw3, isStrike: true, isSpare: false });
+      } else {
+        // Not a strike - try for spare
+        const throw2 = simulateThrow(pinsRemaining, true, opponent.stats, ball, oilPattern, frameNum, 100);
+        if (throw1 + throw2 === 10) {
+          // Spare - get 1 more throw
+          const throw3 = simulateThrow(10, false, opponent.stats, ball, oilPattern, frameNum, 100);
+          frames.push({ throw1, throw2, throw3, isStrike: false, isSpare: true });
+        } else {
+          frames.push({ throw1, throw2, isStrike: false, isSpare: false });
+        }
+      }
+    } else {
+      if (throw1 === 10) {
+        frames.push({ throw1, isStrike: true, isSpare: false });
+      } else {
+        const throw2 = simulateThrow(pinsRemaining, true, opponent.stats, ball, oilPattern, frameNum, 100);
+        const isSpare = throw1 + throw2 === 10;
+        frames.push({ throw1, throw2, isStrike: false, isSpare });
+      }
+    }
+  }
+  
+  const score = calculateGameScore(frames);
+  return { frames, score };
 }

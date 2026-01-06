@@ -1,0 +1,84 @@
+want to expand my existing bowling RPG league/tournament system. Right now, when I click “Enter League” or “Enter Tournament,” the game instantly simulates and returns results. I need to keep that as an option, but also allow players to play matches individually (frame-by-frame) with a choice to Sim instead.
+
+Goal: Add an “Event Lobby” and “Play vs Sim” flow while keeping all existing features and saves working (localStorage, energy, money, averages, etc.). Do not break the current product—extend it.
+
+1) Stop auto-simming on entry (Event Lobby)
+	•	When the player enters a league or tournament, show an Event Lobby screen instead of immediately simming.
+	•	Lobby should show:
+	•	Event name/type (League Night / Tournament Round)
+	•	Entry fee (if applicable)
+	•	Energy cost
+	•	Oil pattern/difficulty
+	•	Your current average and rank/standing
+	•	Opponent(s) for the next game (or list of opponents for the round)
+	•	Provide two main buttons:
+	•	Play Next Game
+	•	Sim Next Game
+	•	Also provide:
+	•	“Sim Entire Event” (optional) for tournaments with multiple games
+	•	“Exit/Back” without simming (if the event allows it)
+
+2) Generate opponents properly (league teams / tournament opponents)
+	•	For league: generate a league consisting of the user + X opponents (e.g., 8–12 total bowlers/teams).
+	•	For tournaments: generate a bracket or a pool of random opponents for the series.
+	•	Opponents should have:
+	•	Name (procedurally generated first/last)
+	•	Handedness/style
+	•	Skill profile (stats similar to player stats: accuracy, power, consistency, etc.)
+	•	A realistic bowling average range tied to their stats
+	•	Opponent skill should scale by event tier:
+	•	Local = easier opponents
+	•	Regional = medium
+	•	Pro = hard (locked behind 200+ average / pro membership if implemented)
+
+3) “Play match” mode (interactive game-by-game)
+
+Add a “Play Match” mode for bowling games:
+	•	When user chooses Play Next Game, run the bowling simulation throw-by-throw or frame-by-frame instead of instant results.
+	•	The player should press a big button like “Roll Ball” for each throw.
+	•	Each roll consumes a small amount of energy (or the event consumes energy upfront; choose one consistent approach).
+	•	Show on the Play screen:
+	•	Frame number (1–10)
+	•	Ball 1 / Ball 2 results
+	•	Current scorecard display (simple)
+	•	Opponent score progress (either simulated live per frame or revealed at end)
+	•	Allow an “Auto-play remainder” or “Sim rest of game” button mid-game (optional).
+
+4) “Sim match” mode (keep current behavior)
+	•	When user chooses Sim Next Game, simulate instantly like it does now, but:
+	•	Still use the same opponent generation and lane conditions
+	•	Still update averages, standings, money, reputation, etc.
+	•	Show a results summary screen
+
+5) Event progression and results
+	•	League nights happen weekly; store:
+	•	league standings (wins/losses or points)
+	•	series scores (e.g., 3-game set) or single game format (choose one and keep it consistent)
+	•	Tournaments can be:
+	•	3-game series total pinfall
+	•	Rank the user vs all opponents
+	•	After each game/series, update:
+	•	Player average
+	•	Money (winnings)
+	•	Reputation/followers
+	•	Event standings
+	•	Display event history and the most recent event results.
+
+6) UI/Navigation requirements
+	•	Add a clear navigation flow:
+	•	Bowling tab → select League/Tournament → Event Lobby → Play or Sim → Results → back to Lobby or exit
+	•	Mobile-first UI, large buttons, simple scorecard.
+	•	Keep save slots and localStorage intact; migrate save data safely if needed.
+
+7) Maintainability
+	•	Refactor the simulation logic so that both “Play” and “Sim” use the same underlying functions:
+	•	A function to generate an opponent
+	•	A function to simulate a single throw
+	•	A function to advance a frame
+	•	A function to finalize a game and update stats
+	•	Add tuning constants at the top for:
+	•	opponent difficulty scaling per tier
+	•	variance/upset factor
+	•	energy costs
+
+Deliverables: Update index.html, style.css, and script.js to implement the Event Lobby, opponent generation, and the Play vs Sim options for league/tournament games, while keeping existing game systems working.

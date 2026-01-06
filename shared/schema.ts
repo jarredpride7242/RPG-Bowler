@@ -16,6 +16,18 @@ export const GAME_CONSTANTS = {
   STAT_MAX: 99,
   AMATEUR_AVG_TARGET: { min: 120, max: 160 },
   PRO_AVG_TARGET: { min: 200, max: 240 },
+  // Opponent difficulty scaling by tier
+  OPPONENT_SKILL_BY_TIER: {
+    "amateur-local": { statMin: 25, statMax: 50, avgMin: 120, avgMax: 160 },
+    "amateur-regional": { statMin: 40, statMax: 65, avgMin: 150, avgMax: 185 },
+    "pro-local": { statMin: 60, statMax: 80, avgMin: 190, avgMax: 210 },
+    "pro-regional": { statMin: 70, statMax: 88, avgMin: 205, avgMax: 225 },
+    "pro-national": { statMin: 80, statMax: 95, avgMin: 215, avgMax: 240 },
+  } as Record<string, { statMin: number; statMax: number; avgMin: number; avgMax: number }>,
+  // Event settings
+  LEAGUE_SIZE: 8,
+  TOURNAMENT_SIZE: 16,
+  UPSET_FACTOR: 0.15, // Variance factor for opponent performance
 };
 
 // ============================================
@@ -172,6 +184,40 @@ export const sponsorSchema = z.object({
 });
 
 export type Sponsor = z.infer<typeof sponsorSchema>;
+
+// ============================================
+// OPPONENT (NPC bowler)
+// ============================================
+export const opponentSchema = z.object({
+  id: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  bowlingStyle: bowlingStyleSchema,
+  handedness: handednessSchema,
+  stats: playerStatsSchema,
+  bowlingAverage: z.number(),
+  currentSeriesScore: z.number().optional(),
+  gamesPlayed: z.number().optional(),
+});
+
+export type Opponent = z.infer<typeof opponentSchema>;
+
+// ============================================
+// ACTIVE EVENT STATE
+// ============================================
+export const activeEventSchema = z.object({
+  competitionId: z.string(),
+  competition: competitionSchema,
+  opponents: z.array(opponentSchema),
+  currentGameIndex: z.number(),
+  playerSeriesScores: z.array(z.number()),
+  opponentSeriesScores: z.array(z.array(z.number())),
+  isComplete: z.boolean(),
+  finalPlacement: z.number().optional(),
+  prizeWon: z.number().optional(),
+});
+
+export type ActiveEvent = z.infer<typeof activeEventSchema>;
 
 // ============================================
 // GAME HISTORY
