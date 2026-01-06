@@ -1,0 +1,36 @@
+Fix my bowling celebration animations and streak detection logic in my existing bowling RPG. Do not redesign the game—only correct these issues while keeping saves and gameplay intact.
+
+Issue A: Celebration overlay is too large and lasts too long
+	•	Reduce the celebration overlay so it does NOT cover most of the screen.
+	•	Target: centered banner/toast style near the top or center, taking no more than ~25–35% of the screen height.
+	•	Reduce duration: animation should complete and disappear in 0.6–1.0 seconds.
+	•	Make it non-blocking: overlay should not prevent clicking UI (pointer-events none).
+	•	Add a tuning constant for duration like CELEBRATION_MS = 800.
+	•	Ensure only one celebration shows at a time (if a new one triggers, replace the old one).
+
+Issue B: Double/Turkey logic is incorrect
+
+Current bug: “Double” and “Turkey” are being triggered by the 2nd/3rd strike in the entire game, not consecutive strikes. Example: strike in frames 2, 8, 11 incorrectly triggers turkey.
+
+Correct rules:
+	•	Strike: current frame is a strike (or strike roll).
+	•	Double: only when the player has 2 consecutive strikes in consecutive frames/rolls (back-to-back).
+	•	Turkey: only when the player has 3 consecutive strikes in consecutive frames/rolls (back-to-back-to-back).
+	•	Non-strike rolls reset the streak counter to 0 (spares and opens both break a strike streak).
+	•	The 10th frame can include extra rolls; consecutive strike streak must treat the extra rolls as continuing the streak only if they are consecutive strikes with no non-strike in between.
+
+Implementation requirements
+	•	Add a consecutiveStrikes counter that updates after every roll or after each frame is resolved (choose the approach that matches the current code).
+	•	Increment consecutiveStrikes ONLY when a strike occurs on that roll/frame.
+	•	Reset consecutiveStrikes to 0 when a roll/frame is not a strike.
+	•	Trigger celebrations based on this counter:
+	•	if consecutiveStrikes === 1 → show “STRIKE”
+	•	if consecutiveStrikes === 2 → show “DOUBLE”
+	•	if consecutiveStrikes === 3 → show “TURKEY”
+	•	if consecutiveStrikes > 3 → optionally keep showing “STRIKE STREAK!” or show nothing (but do NOT repeatedly show turkey).
+	•	Ensure the logic does not look at “total strikes in game,” only the consecutive streak.
+
+Deliverables
+	•	Update the celebration UI/CSS to be smaller and faster (short duration, smaller font, less screen coverage).
+	•	Fix the streak detection so doubles/turkeys only trigger on consecutive strikes.
+	•	Keep all other game systems unchanged.

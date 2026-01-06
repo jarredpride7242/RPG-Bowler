@@ -135,30 +135,28 @@ export function BowlScreen() {
   
   const settings = getSettings();
   
-  useEffect(() => {
-    if (!settings.enableAnimations || frames.length === 0) return;
+  const triggerCelebration = useCallback((isStrike: boolean, isSpare: boolean) => {
+    if (!settings.enableAnimations) return;
     
-    const lastFrame = frames[frames.length - 1];
-    if (!lastFrame) return;
-    
-    if (lastFrame.isStrike) {
-      const newStrikes = consecutiveStrikes + 1;
-      setConsecutiveStrikes(newStrikes);
-      
-      if (newStrikes >= 3) {
-        setCelebration("turkey");
-      } else if (newStrikes === 2) {
-        setCelebration("double");
-      } else {
-        setCelebration("strike");
-      }
-    } else if (lastFrame.isSpare) {
+    if (isStrike) {
+      setConsecutiveStrikes(prev => {
+        const newStrikes = prev + 1;
+        if (newStrikes >= 3) {
+          setCelebration("turkey");
+        } else if (newStrikes === 2) {
+          setCelebration("double");
+        } else {
+          setCelebration("strike");
+        }
+        return newStrikes;
+      });
+    } else if (isSpare) {
       setConsecutiveStrikes(0);
       setCelebration("spare");
-    } else if (lastFrame.throw2 !== undefined) {
+    } else {
       setConsecutiveStrikes(0);
     }
-  }, [frames.length]);
+  }, [settings.enableAnimations]);
   
   if (!currentProfile) return null;
   
@@ -221,6 +219,7 @@ export function BowlScreen() {
           }]);
           setPinsRemaining(10);
           setThrowNumber(2);
+          triggerCelebration(true, false);
         } else {
           setFrames(prev => [...prev, {
             frameNumber: frameNum,
@@ -234,6 +233,7 @@ export function BowlScreen() {
           }]);
           setPinsRemaining(newPinsRemaining);
           setThrowNumber(2);
+          triggerCelebration(false, false);
         }
       } else if (isStrike) {
         const newFrame: FrameResult = {
@@ -250,6 +250,7 @@ export function BowlScreen() {
         setCurrentFrame(prev => prev + 1);
         setPinsRemaining(10);
         setThrowNumber(1);
+        triggerCelebration(true, false);
       } else {
         setPinsRemaining(newPinsRemaining);
         setThrowNumber(2);
@@ -267,6 +268,7 @@ export function BowlScreen() {
           };
           return updated;
         });
+        triggerCelebration(false, false);
       }
     } else if (throwNumber === 2) {
       if (isTenthFrame) {
@@ -288,7 +290,9 @@ export function BowlScreen() {
         if (prevWasStrike || isStrikeNow || isSpareNow) {
           setPinsRemaining(isStrikeNow || isSpareNow ? 10 : newPinsRemaining);
           setThrowNumber(3);
+          triggerCelebration(isStrikeNow, isSpareNow);
         } else {
+          triggerCelebration(false, false);
           finishGame([...frames.slice(0, currentFrame), {
             ...frames[currentFrame],
             throw2: pinsKnocked,
@@ -320,8 +324,10 @@ export function BowlScreen() {
         setCurrentFrame(prev => prev + 1);
         setPinsRemaining(10);
         setThrowNumber(1);
+        triggerCelebration(false, isSpare);
       }
     } else {
+      const isThirdStrike = pinsKnocked === 10;
       setFrames(prev => {
         const updated = [...prev];
         updated[currentFrame] = {
@@ -331,12 +337,14 @@ export function BowlScreen() {
         return updated;
       });
       
+      triggerCelebration(isThirdStrike, false);
+      
       finishGame([...frames.slice(0, currentFrame), {
         ...frames[currentFrame],
         throw3: pinsKnocked,
       }]);
     }
-  }, [activeBall, currentFrame, currentProfile, frames, gameComplete, oilPattern, pinsRemaining, throwNumber, useEnergy]);
+  }, [activeBall, currentFrame, currentProfile, frames, gameComplete, oilPattern, pinsRemaining, throwNumber, triggerCelebration]);
   
   const finishGame = (finalFrames: FrameResult[]) => {
     setGameComplete(true);

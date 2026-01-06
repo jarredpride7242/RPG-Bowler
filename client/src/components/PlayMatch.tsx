@@ -158,30 +158,28 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
     setFeaturedOpponentScore(score);
   }, [featuredOpponent, oilPattern]);
   
-  useEffect(() => {
-    if (!settings.enableAnimations || playerFrames.length === 0) return;
+  const triggerCelebration = useCallback((isStrike: boolean, isSpare: boolean) => {
+    if (!settings.enableAnimations) return;
     
-    const lastFrame = playerFrames[playerFrames.length - 1];
-    if (!lastFrame) return;
-    
-    if (lastFrame.isStrike) {
-      const newStrikes = consecutiveStrikes + 1;
-      setConsecutiveStrikes(newStrikes);
-      
-      if (newStrikes >= 3) {
-        setCelebration("turkey");
-      } else if (newStrikes === 2) {
-        setCelebration("double");
-      } else {
-        setCelebration("strike");
-      }
-    } else if (lastFrame.isSpare) {
+    if (isStrike) {
+      setConsecutiveStrikes(prev => {
+        const newStrikes = prev + 1;
+        if (newStrikes >= 3) {
+          setCelebration("turkey");
+        } else if (newStrikes === 2) {
+          setCelebration("double");
+        } else {
+          setCelebration("strike");
+        }
+        return newStrikes;
+      });
+    } else if (isSpare) {
       setConsecutiveStrikes(0);
       setCelebration("spare");
-    } else if (lastFrame.throw2 !== undefined) {
+    } else {
       setConsecutiveStrikes(0);
     }
-  }, [playerFrames.length]);
+  }, [settings.enableAnimations]);
   
   if (!currentProfile) return null;
   
@@ -238,6 +236,7 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
           }]);
           setPinsRemaining(10);
           setThrowNumber(2);
+          triggerCelebration(true, false);
         } else {
           setPlayerFrames(prev => [...prev, {
             frameNumber: frameNum,
@@ -251,6 +250,7 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
           }]);
           setPinsRemaining(newPinsRemaining);
           setThrowNumber(2);
+          triggerCelebration(false, false);
         }
       } else if (isStrike) {
         const newFrame: FrameResult = {
@@ -267,6 +267,7 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
         setCurrentFrame(prev => prev + 1);
         setPinsRemaining(10);
         setThrowNumber(1);
+        triggerCelebration(true, false);
       } else {
         setPinsRemaining(newPinsRemaining);
         setThrowNumber(2);
@@ -284,6 +285,7 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
           };
           return updated;
         });
+        triggerCelebration(false, false);
       }
     } else if (throwNumber === 2) {
       if (isTenthFrame) {
@@ -305,7 +307,9 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
         if (prevWasStrike || isStrikeNow || isSpareNow) {
           setPinsRemaining(isStrikeNow || isSpareNow ? 10 : newPinsRemaining);
           setThrowNumber(3);
+          triggerCelebration(isStrikeNow, isSpareNow);
         } else {
+          triggerCelebration(false, false);
           finishGame([...playerFrames.slice(0, currentFrame), {
             ...playerFrames[currentFrame],
             throw2: pinsKnocked,
@@ -337,8 +341,10 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
         setCurrentFrame(prev => prev + 1);
         setPinsRemaining(10);
         setThrowNumber(1);
+        triggerCelebration(false, isSpare);
       }
     } else {
+      const isThirdStrike = pinsKnocked === 10;
       setPlayerFrames(prev => {
         const updated = [...prev];
         updated[currentFrame] = {
@@ -348,12 +354,14 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
         return updated;
       });
       
+      triggerCelebration(isThirdStrike, false);
+      
       finishGame([...playerFrames.slice(0, currentFrame), {
         ...playerFrames[currentFrame],
         throw3: pinsKnocked,
       }]);
     }
-  }, [activeBall, currentFrame, currentProfile, playerFrames, gameComplete, oilPattern, pinsRemaining, throwNumber]);
+  }, [activeBall, currentFrame, currentProfile, playerFrames, gameComplete, oilPattern, pinsRemaining, throwNumber, triggerCelebration]);
   
   const finishGame = (finalFrames: FrameResult[]) => {
     setGameComplete(true);

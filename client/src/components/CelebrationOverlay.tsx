@@ -9,34 +9,36 @@ interface CelebrationOverlayProps {
   enabled?: boolean;
 }
 
+const CELEBRATION_MS = 800;
+
 const CELEBRATION_CONFIG = {
   spare: {
     text: "SPARE!",
     color: "text-chart-2",
-    bg: "bg-chart-2/20",
-    duration: 1500,
-    scale: 1.1,
+    bg: "bg-chart-2/10",
+    duration: CELEBRATION_MS,
+    scale: 1.0,
   },
   strike: {
     text: "STRIKE!",
     color: "text-primary",
-    bg: "bg-primary/20",
-    duration: 1800,
-    scale: 1.2,
+    bg: "bg-primary/10",
+    duration: CELEBRATION_MS,
+    scale: 1.0,
   },
   double: {
     text: "DOUBLE!",
     color: "text-chart-3",
-    bg: "bg-chart-3/20",
-    duration: 2000,
-    scale: 1.3,
+    bg: "bg-chart-3/10",
+    duration: CELEBRATION_MS,
+    scale: 1.0,
   },
   turkey: {
     text: "TURKEY!",
     color: "text-destructive",
-    bg: "bg-destructive/20",
-    duration: 2500,
-    scale: 1.4,
+    bg: "bg-destructive/10",
+    duration: CELEBRATION_MS,
+    scale: 1.0,
   },
 };
 
@@ -60,51 +62,36 @@ export function CelebrationOverlay({ type, onComplete, enabled = true }: Celebra
   const config = CELEBRATION_CONFIG[type];
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {visible && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: config.scale }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          transition={{ type: "spring", damping: 15, stiffness: 300 }}
+          key={type}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
           className={`
-            fixed inset-0 z-50 flex items-center justify-center pointer-events-none
-            ${config.bg}
+            fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+            px-6 py-3 rounded-lg shadow-lg
+            ${config.bg} backdrop-blur-sm border border-border/50
           `}
           data-testid={`celebration-${type}`}
         >
-          <motion.div
-            animate={{
-              rotate: [0, -5, 5, -5, 5, 0],
-              scale: [1, 1.1, 1, 1.1, 1],
-            }}
-            transition={{ duration: 0.5, repeat: 2 }}
-            className="text-center"
-          >
-            <h1 className={`text-5xl font-black tracking-wider ${config.color}`}>
+          <div className="text-center">
+            <h2 className={`text-2xl font-bold tracking-wide ${config.color}`}>
               {config.text}
-            </h1>
+            </h2>
             {type === "turkey" && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mt-2 text-lg font-bold text-muted-foreground"
-              >
-                3 Strikes in a Row!
-              </motion.div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                3 in a Row!
+              </p>
             )}
             {type === "double" && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mt-2 text-lg font-bold text-muted-foreground"
-              >
-                2 Strikes in a Row!
-              </motion.div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                2 in a Row!
+              </p>
             )}
-          </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
