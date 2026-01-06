@@ -270,6 +270,7 @@ interface GameContextType {
   canUnlockCosmetic: (cosmeticId: string) => boolean;
   unlockCosmetic: (cosmeticId: string) => boolean;
   equipCosmetic: (cosmeticId: string | null, category: CosmeticCategory) => void;
+  spendLegacyPoints: (amount: number) => boolean;
   
   // Sponsorship negotiation system
   getAvailableSponsorOffers: () => SponsorOffer[];
@@ -1223,6 +1224,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
   }, [currentProfile, updateProfile]);
 
+  // Spend legacy points for various unlocks (alley items, etc.)
+  const spendLegacyPoints = useCallback((amount: number): boolean => {
+    const legacy = getLegacyData();
+    if (legacy.legacyPoints < amount) return false;
+    
+    setGameState(prev => ({
+      ...prev,
+      legacyData: {
+        ...legacy,
+        legacyPoints: legacy.legacyPoints - amount,
+      },
+    }));
+    return true;
+  }, [getLegacyData, setGameState]);
+
   // ============================================
   // SPONSORSHIP NEGOTIATION SYSTEM
   // ============================================
@@ -1376,6 +1392,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       canUnlockCosmetic,
       unlockCosmetic,
       equipCosmetic,
+      spendLegacyPoints,
       // Sponsorship negotiation
       getAvailableSponsorOffers,
       getNegotiatedSponsor,

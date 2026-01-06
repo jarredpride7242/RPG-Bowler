@@ -74,7 +74,7 @@ function getDefaultAlleyEnvironment(): AlleyEnvironment {
 }
 
 export function AlleyTab() {
-  const { currentProfile, updateProfile, getLegacyData } = useGame();
+  const { currentProfile, updateProfile, getLegacyData, spendLegacyPoints } = useGame();
   const [activeCategory, setActiveCategory] = useState("lane");
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState("");
@@ -150,19 +150,27 @@ export function AlleyTab() {
     if (!canPurchaseItem(item)) return;
     
     const newUnlockedItems = [...alleyEnv.unlockedItems, item.id];
-    let newMoney = currentProfile.money;
     
     if (item.unlockMethod === "purchase") {
-      newMoney = currentProfile.money - (item.unlockRequirement.price ?? 0);
+      const newMoney = currentProfile.money - (item.unlockRequirement.price ?? 0);
+      updateProfile({
+        money: newMoney,
+        alleyEnvironment: {
+          ...alleyEnv,
+          unlockedItems: newUnlockedItems,
+        },
+      });
+    } else if (item.unlockMethod === "legacy") {
+      const legacyCost = item.unlockRequirement.legacyPointsCost ?? 0;
+      if (spendLegacyPoints(legacyCost)) {
+        updateProfile({
+          alleyEnvironment: {
+            ...alleyEnv,
+            unlockedItems: newUnlockedItems,
+          },
+        });
+      }
     }
-    
-    updateProfile({
-      money: newMoney,
-      alleyEnvironment: {
-        ...alleyEnv,
-        unlockedItems: newUnlockedItems,
-      },
-    });
   };
   
   const handleEquip = (item: AlleyEnvironmentItem) => {
