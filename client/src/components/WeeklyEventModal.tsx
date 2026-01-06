@@ -70,6 +70,7 @@ export function WeeklyEventModal() {
                 key={choice.id} 
                 className={`${affordable ? "hover-elevate cursor-pointer" : "opacity-50"}`}
                 onClick={() => affordable && handleChoice(choice.id)}
+                data-testid={`card-event-choice-${choice.id}`}
               >
                 <CardContent className="p-4">
                   <p className="font-medium mb-2">{choice.label}</p>

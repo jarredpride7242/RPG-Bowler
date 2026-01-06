@@ -252,19 +252,24 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
         </CardContent>
       </Card>
       
-      {(activeEventEffects.length > 0 || partner) && (
+      {partner && (
         <Card>
-          <CardContent className="p-4 space-y-3">
-            {partner && (
-              <div className="flex items-center gap-2 text-sm">
-                <Badge variant="secondary" className="text-purple-400">
-                  Dating {partner.match.name}
-                </Badge>
-                <span className="text-muted-foreground">
-                  {partner.relationshipLevel}% connection
-                </span>
-              </div>
-            )}
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-sm" data-testid="status-relationship">
+              <Badge variant="secondary" className="text-purple-400">
+                Dating {partner.match.name}
+              </Badge>
+              <span className="text-muted-foreground">
+                {partner.relationshipLevel}% connection
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {activeEventEffects.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
             <ActiveEffectsPanel />
           </CardContent>
         </Card>

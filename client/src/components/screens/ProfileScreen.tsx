@@ -57,7 +57,6 @@ import { HallOfFamePanel } from "@/components/HallOfFamePanel";
 import { SponsorNegotiationPanel } from "@/components/SponsorNegotiationPanel";
 import { AlleyTab } from "@/components/AlleyTab";
 import { DatingTab } from "@/components/DatingTab";
-import { ActiveEffectsPanel } from "@/components/WeeklyEventModal";
 
 const STAT_ICONS: Record<string, typeof Target> = {
   throwPower: Zap,
