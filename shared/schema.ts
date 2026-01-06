@@ -466,6 +466,24 @@ export const hallOfFameEntrySchema = z.object({
   totalEarnings: z.number(),
   perfectGames: z.number(),
   retiredAt: z.string(),
+  // Expanded career summary fields
+  highGame: z.number().optional(),
+  highSeries: z.number().optional(),
+  totalGamesPlayed: z.number().optional(),
+  leagueWins: z.number().optional(),
+  tournamentWins: z.number().optional(),
+  longestStrikeStreak: z.number().optional(),
+  strikePercentage: z.number().optional(),
+  sparePercentage: z.number().optional(),
+  rivalRecord: z.object({
+    wins: z.number(),
+    losses: z.number(),
+  }).optional(),
+  achievementsEarned: z.number().optional(),
+  cosmeticsCollected: z.number().optional(),
+  trait: z.string().optional(),
+  bowlingStyle: z.string().optional(),
+  legacyPointsAwarded: z.number().optional(),
 });
 
 export type HallOfFameEntry = z.infer<typeof hallOfFameEntrySchema>;
@@ -540,6 +558,143 @@ export const weeklyChallengeStateSchema = z.object({
 export type WeeklyChallengeState = z.infer<typeof weeklyChallengeStateSchema>;
 
 // ============================================
+// COSMETIC SYSTEM
+// ============================================
+export const cosmeticCategorySchema = z.enum(["shoes", "gloves", "outfit", "ball-skin", "ui-theme"]);
+export type CosmeticCategory = z.infer<typeof cosmeticCategorySchema>;
+
+export const cosmeticUnlockMethodSchema = z.enum(["achievement", "challenge", "reputation", "purchase", "legacy"]);
+export type CosmeticUnlockMethod = z.infer<typeof cosmeticUnlockMethodSchema>;
+
+export const cosmeticItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: cosmeticCategorySchema,
+  description: z.string(),
+  icon: z.string(), // Lucide icon name
+  rarity: z.enum(["common", "uncommon", "rare", "legendary"]),
+  unlockMethod: cosmeticUnlockMethodSchema,
+  unlockRequirement: z.object({
+    achievementId: z.string().optional(),
+    challengeReward: z.boolean().optional(),
+    reputationRequired: z.number().optional(),
+    price: z.number().optional(),
+    legacyPointsCost: z.number().optional(),
+  }),
+});
+
+export type CosmeticItem = z.infer<typeof cosmeticItemSchema>;
+
+export const equippedCosmeticsSchema = z.object({
+  shoes: z.string().nullable().default(null),
+  gloves: z.string().nullable().default(null),
+  outfit: z.string().nullable().default(null),
+  ballSkin: z.string().nullable().default(null),
+  uiTheme: z.string().nullable().default(null),
+});
+
+export type EquippedCosmetics = z.infer<typeof equippedCosmeticsSchema>;
+
+export const AVAILABLE_COSMETICS: CosmeticItem[] = [
+  // Shoes
+  { id: "shoes-classic", name: "Classic Leather", category: "shoes", description: "Traditional bowling shoes", icon: "Footprints", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 500 } },
+  { id: "shoes-pro", name: "Pro Performance", category: "shoes", description: "High-performance bowling shoes", icon: "Footprints", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 30 } },
+  { id: "shoes-gold", name: "Golden Steps", category: "shoes", description: "Luxurious gold-trimmed shoes", icon: "Footprints", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "money_maker" } },
+  { id: "shoes-legend", name: "Hall of Fame Edition", category: "shoes", description: "Reserved for legends only", icon: "Footprints", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 15 } },
+  // Gloves
+  { id: "gloves-basic", name: "Starter Grip", category: "gloves", description: "Basic bowling glove", icon: "Hand", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 300 } },
+  { id: "gloves-power", name: "Power Grip", category: "gloves", description: "Enhanced grip for power throws", icon: "Hand", rarity: "uncommon", unlockMethod: "challenge", unlockRequirement: { challengeReward: true } },
+  { id: "gloves-chrome", name: "Chrome Finish", category: "gloves", description: "Sleek metallic gloves", icon: "Hand", rarity: "rare", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 50 } },
+  { id: "gloves-fire", name: "Flame Master", category: "gloves", description: "For the hottest bowlers", icon: "Hand", rarity: "legendary", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_300_game" } },
+  // Outfits
+  { id: "outfit-casual", name: "Casual Friday", category: "outfit", description: "Relaxed bowling attire", icon: "Shirt", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 750 } },
+  { id: "outfit-team", name: "Team Jersey", category: "outfit", description: "Official league jersey", icon: "Shirt", rarity: "uncommon", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_league_championship" } },
+  { id: "outfit-pro", name: "Pro Tour Uniform", category: "outfit", description: "Professional tour outfit", icon: "Shirt", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "went_pro" } },
+  { id: "outfit-champion", name: "Champion's Robe", category: "outfit", description: "The mark of a true champion", icon: "Shirt", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 20 } },
+  // Ball Skins
+  { id: "ball-classic", name: "Classic Black", category: "ball-skin", description: "Traditional black finish", icon: "Circle", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 400 } },
+  { id: "ball-flames", name: "Fire Pattern", category: "ball-skin", description: "Blazing flame design", icon: "Circle", rarity: "uncommon", unlockMethod: "challenge", unlockRequirement: { challengeReward: true } },
+  { id: "ball-galaxy", name: "Galaxy Swirl", category: "ball-skin", description: "Cosmic galaxy pattern", icon: "Circle", rarity: "rare", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 60 } },
+  { id: "ball-diamond", name: "Diamond Edition", category: "ball-skin", description: "Sparkling diamond finish", icon: "Circle", rarity: "legendary", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_perfect_game" } },
+  // UI Themes
+  { id: "theme-purple", name: "Violet Storm", category: "ui-theme", description: "Deep purple accent theme", icon: "Palette", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 200 } },
+  { id: "theme-green", name: "Emerald Lane", category: "ui-theme", description: "Fresh green accent theme", icon: "Palette", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 25 } },
+  { id: "theme-gold", name: "Golden Era", category: "ui-theme", description: "Luxurious gold accent theme", icon: "Palette", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_tournament_win" } },
+  { id: "theme-rainbow", name: "Strike Spectrum", category: "ui-theme", description: "Animated rainbow theme", icon: "Palette", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 10 } },
+];
+
+// ============================================
+// SPONSORSHIP NEGOTIATION SYSTEM
+// ============================================
+export const sponsorTierSchema = z.enum(["local", "regional", "national", "elite"]);
+export type SponsorTier = z.infer<typeof sponsorTierSchema>;
+
+export const negotiatedSponsorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  tier: sponsorTierSchema,
+  weeklyStipend: z.number(),
+  tournamentBonus: z.number(), // Percentage of winnings
+  requirements: z.object({
+    minAverage: z.number(),
+    minReputation: z.number(),
+    tournamentsPerSeason: z.number(),
+  }),
+  penalties: z.object({
+    repLossPerWeek: z.number(), // Rep lost if requirements not met
+    canBeFired: z.boolean(),
+  }),
+  weeksRemaining: z.number(),
+  tournamentsEntered: z.number().default(0),
+  requirementsMet: z.boolean().default(true),
+  warningGiven: z.boolean().default(false),
+});
+
+export type NegotiatedSponsor = z.infer<typeof negotiatedSponsorSchema>;
+
+export const sponsorOfferSchema = z.object({
+  sponsor: z.object({
+    id: z.string(),
+    name: z.string(),
+    tier: sponsorTierSchema,
+  }),
+  safeOffer: z.object({
+    weeklyStipend: z.number(),
+    tournamentBonus: z.number(),
+    requirements: z.object({
+      minAverage: z.number(),
+      minReputation: z.number(),
+      tournamentsPerSeason: z.number(),
+    }),
+    contractWeeks: z.number(),
+  }),
+  negotiatedOffer: z.object({
+    weeklyStipend: z.number(),
+    tournamentBonus: z.number(),
+    requirements: z.object({
+      minAverage: z.number(),
+      minReputation: z.number(),
+      tournamentsPerSeason: z.number(),
+    }),
+    contractWeeks: z.number(),
+    negotiationSuccessChance: z.number(), // 0-100
+  }),
+});
+
+export type SponsorOffer = z.infer<typeof sponsorOfferSchema>;
+
+export const SPONSOR_TEMPLATES: Array<{ id: string; name: string; tier: SponsorTier; baseStipend: number; baseBonus: number; baseReqs: { avg: number; rep: number; tournaments: number } }> = [
+  { id: "local-lanes", name: "Local Lanes Alley", tier: "local", baseStipend: 100, baseBonus: 5, baseReqs: { avg: 140, rep: 15, tournaments: 1 } },
+  { id: "bowling-supply-co", name: "Bowling Supply Co.", tier: "local", baseStipend: 150, baseBonus: 8, baseReqs: { avg: 150, rep: 20, tournaments: 2 } },
+  { id: "regional-sports", name: "Regional Sports Network", tier: "regional", baseStipend: 300, baseBonus: 10, baseReqs: { avg: 170, rep: 30, tournaments: 3 } },
+  { id: "strike-zone-gear", name: "Strike Zone Gear", tier: "regional", baseStipend: 400, baseBonus: 12, baseReqs: { avg: 180, rep: 35, tournaments: 3 } },
+  { id: "national-bowling", name: "National Bowling League", tier: "national", baseStipend: 750, baseBonus: 15, baseReqs: { avg: 200, rep: 50, tournaments: 4 } },
+  { id: "pro-tour-sponsors", name: "Pro Tour Sponsors Inc.", tier: "national", baseStipend: 1000, baseBonus: 18, baseReqs: { avg: 210, rep: 60, tournaments: 5 } },
+  { id: "elite-sports-mgmt", name: "Elite Sports Management", tier: "elite", baseStipend: 2000, baseBonus: 25, baseReqs: { avg: 220, rep: 75, tournaments: 6 } },
+  { id: "championship-brands", name: "Championship Brands", tier: "elite", baseStipend: 3000, baseBonus: 30, baseReqs: { avg: 230, rep: 85, tournaments: 8 } },
+];
+
+// ============================================
 // GAME SETTINGS
 // ============================================
 export const gameSettingsSchema = z.object({
@@ -552,20 +707,36 @@ export const gameSettingsSchema = z.object({
 export type GameSettings = z.infer<typeof gameSettingsSchema>;
 
 // ============================================
-// CAREER STATS (for summary)
+// CAREER STATS / RECORDS (expanded)
 // ============================================
 export const careerStatsSchema = z.object({
+  // Game Records
   highGame: z.number().default(0),
+  highSeries: z.number().default(0), // Best 3-game series
+  longestStrikeStreak: z.number().default(0),
+  // Counts
   totalStrikes: z.number().default(0),
   totalSpares: z.number().default(0),
+  totalOpens: z.number().default(0),
+  totalSplits: z.number().default(0),
+  splitsConverted: z.number().default(0),
   totalTurkeys: z.number().default(0),
   totalDoubles: z.number().default(0),
   perfectGames: z.number().default(0),
+  // Competition Records
   leagueWins: z.number().default(0),
   tournamentWins: z.number().default(0),
+  bestTournamentFinish: z.number().default(0), // 1 = 1st place, 0 = never competed
+  totalTitles: z.number().default(0), // leagues + tournaments
+  // Financial
   totalEarnings: z.number().default(0),
+  // Rivalries
   rivalWins: z.number().default(0),
-  longestStrikeStreak: z.number().default(0),
+  rivalLosses: z.number().default(0),
+  // Percentages are calculated dynamically, but we track the frame counts
+  totalFrames: z.number().default(0),
+  strikeFrames: z.number().default(0),
+  spareFrames: z.number().default(0),
 });
 
 export type CareerStats = z.infer<typeof careerStatsSchema>;
@@ -652,6 +823,13 @@ export const playerProfileSchema = z.object({
   weeklyChallenges: weeklyChallengeStateSchema.optional(),
   // Cosmetic tokens (earned from challenges)
   cosmeticTokens: z.number().optional(),
+  // Cosmetics system
+  unlockedCosmetics: z.array(z.string()).optional(),
+  equippedCosmetics: equippedCosmeticsSchema.optional(),
+  // Sponsorship negotiation system (for pros)
+  negotiatedSponsor: negotiatedSponsorSchema.nullable().optional(),
+  // Season tracking for sponsor requirements
+  tournamentsThisSeason: z.number().optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;

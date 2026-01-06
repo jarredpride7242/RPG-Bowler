@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,16 +35,24 @@ import {
   Save,
   GraduationCap,
   AlertTriangle,
-  Crown
+  Crown,
+  Building2,
+  Palette,
+  Trophy,
+  Award,
+  Lock
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useTheme } from "@/lib/themeContext";
-import { GAME_CONSTANTS, ACHIEVEMENT_INFO, type AchievementId } from "@shared/schema";
-import { Trophy, Award, Lock } from "lucide-react";
+import { GAME_CONSTANTS } from "@shared/schema";
 import { CoachesTab } from "@/components/CoachesTab";
 import { InjurySlumpPanel } from "@/components/InjurySlumpPanel";
 import { WeeklyChallengesPanel } from "@/components/WeeklyChallengesPanel";
 import { LegacyPanel } from "@/components/LegacyPanel";
+import { CosmeticsTab } from "@/components/CosmeticsTab";
+import { AchievementsRecordsTab } from "@/components/AchievementsRecordsTab";
+import { HallOfFamePanel } from "@/components/HallOfFamePanel";
+import { SponsorNegotiationPanel } from "@/components/SponsorNegotiationPanel";
 
 const STAT_ICONS: Record<string, typeof Target> = {
   throwPower: Zap,
@@ -182,23 +191,35 @@ export function ProfileScreen() {
       </Card>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview" className="text-xs px-1" data-testid="tab-overview">
-            <User className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="challenges" className="text-xs px-1" data-testid="tab-challenges">
-            <Target className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="coach" className="text-xs px-1" data-testid="tab-coach">
-            <GraduationCap className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="health" className="text-xs px-1" data-testid="tab-health">
-            <Heart className="w-4 h-4" />
-          </TabsTrigger>
-          <TabsTrigger value="legacy" className="text-xs px-1" data-testid="tab-legacy">
-            <Crown className="w-4 h-4" />
-          </TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex w-auto gap-1">
+            <TabsTrigger value="overview" className="text-xs px-2 shrink-0" data-testid="tab-overview">
+              <User className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="text-xs px-2 shrink-0" data-testid="tab-achievements">
+              <Trophy className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="cosmetics" className="text-xs px-2 shrink-0" data-testid="tab-cosmetics">
+              <Palette className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="sponsors" className="text-xs px-2 shrink-0" data-testid="tab-sponsors">
+              <Building2 className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="challenges" className="text-xs px-2 shrink-0" data-testid="tab-challenges">
+              <Target className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="coach" className="text-xs px-2 shrink-0" data-testid="tab-coach">
+              <GraduationCap className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="health" className="text-xs px-2 shrink-0" data-testid="tab-health">
+              <Heart className="w-4 h-4" />
+            </TabsTrigger>
+            <TabsTrigger value="legacy" className="text-xs px-2 shrink-0" data-testid="tab-legacy">
+              <Crown className="w-4 h-4" />
+            </TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
         
         <TabsContent value="overview" className="mt-4 space-y-4">
           <Card>
@@ -212,53 +233,6 @@ export function ProfileScreen() {
               {Object.entries(currentProfile.stats).map(([key, value]) => 
                 renderStatRow(key, value)
               )}
-            </CardContent>
-          </Card>
-      
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                Achievements ({
-                  (() => {
-                    const earnedFromNew = currentProfile.earnedAchievements?.filter(a => a.earnedAt).map(a => a.id) || [];
-                    const earnedFromLegacy = currentProfile.achievements || [];
-                    const allEarned = new Set([...earnedFromNew, ...earnedFromLegacy]);
-                    return allEarned.size;
-                  })()
-                }/{Object.keys(ACHIEVEMENT_INFO).length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid gap-2">
-                {Object.entries(ACHIEVEMENT_INFO).map(([id, info]) => {
-                  const earnedData = currentProfile.earnedAchievements?.find(a => a.id === id);
-                  const earned = earnedData?.earnedAt !== undefined || currentProfile.achievements?.includes(id);
-                  
-                  return (
-                    <div 
-                      key={id}
-                      className={`flex items-center gap-3 p-2 rounded-md ${earned ? "bg-primary/10 border border-primary/20" : "bg-muted/50"}`}
-                      data-testid={`achievement-${id}`}
-                    >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${earned ? "bg-primary text-primary-foreground" : "bg-muted-foreground/20 text-muted-foreground"}`}>
-                        {earned ? <Award className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${earned ? "" : "text-muted-foreground"}`}>
-                          {info.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {info.description}
-                        </p>
-                        {earnedData?.progress !== undefined && earnedData?.target !== undefined && !earned && (
-                          <Progress value={(earnedData.progress / earnedData.target) * 100} className="h-1 mt-1" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </CardContent>
           </Card>
       
@@ -334,6 +308,18 @@ export function ProfileScreen() {
           )}
         </TabsContent>
         
+        <TabsContent value="achievements" className="mt-4">
+          <AchievementsRecordsTab />
+        </TabsContent>
+        
+        <TabsContent value="cosmetics" className="mt-4">
+          <CosmeticsTab />
+        </TabsContent>
+        
+        <TabsContent value="sponsors" className="mt-4">
+          <SponsorNegotiationPanel />
+        </TabsContent>
+        
         <TabsContent value="challenges" className="mt-4">
           <WeeklyChallengesPanel />
         </TabsContent>
@@ -346,8 +332,9 @@ export function ProfileScreen() {
           <InjurySlumpPanel />
         </TabsContent>
         
-        <TabsContent value="legacy" className="mt-4">
+        <TabsContent value="legacy" className="mt-4 space-y-4">
           <LegacyPanel />
+          <HallOfFamePanel />
         </TabsContent>
       </Tabs>
       

@@ -26,7 +26,13 @@ import type {
   WeeklyChallengeState,
   LegacyData,
   HallOfFameEntry,
-  RecoveryAction
+  RecoveryAction,
+  CosmeticItem,
+  CosmeticCategory,
+  EquippedCosmetics,
+  NegotiatedSponsor,
+  SponsorOffer,
+  SponsorTier
 } from "@shared/schema";
 import { 
   GAME_CONSTANTS, 
@@ -36,10 +42,38 @@ import {
   POSSIBLE_EFFECTS, 
   RECOVERY_ACTIONS,
   CHALLENGE_TEMPLATES,
-  LEGACY_BONUSES
+  LEGACY_BONUSES,
+  AVAILABLE_COSMETICS,
+  SPONSOR_TEMPLATES
 } from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
+
+function getDefaultCareerStats(): import("@shared/schema").CareerStats {
+  return {
+    highGame: 0,
+    highSeries: 0,
+    longestStrikeStreak: 0,
+    totalStrikes: 0,
+    totalSpares: 0,
+    totalOpens: 0,
+    totalSplits: 0,
+    splitsConverted: 0,
+    totalTurkeys: 0,
+    totalDoubles: 0,
+    perfectGames: 0,
+    leagueWins: 0,
+    tournamentWins: 0,
+    bestTournamentFinish: 0,
+    totalTitles: 0,
+    totalEarnings: 0,
+    rivalWins: 0,
+    rivalLosses: 0,
+    totalFrames: 0,
+    strikeFrames: 0,
+    spareFrames: 0,
+  };
+}
 
 function generateStarterBall(): BowlingBall {
   return {
@@ -168,6 +202,21 @@ interface GameContextType {
   canRetire: () => boolean;
   retire: () => number;
   applyLegacyBonus: (bonusId: string) => boolean;
+  
+  // Cosmetics system
+  getAvailableCosmetics: () => CosmeticItem[];
+  getUnlockedCosmetics: () => string[];
+  getEquippedCosmetics: () => EquippedCosmetics;
+  canUnlockCosmetic: (cosmeticId: string) => boolean;
+  unlockCosmetic: (cosmeticId: string) => boolean;
+  equipCosmetic: (cosmeticId: string | null, category: CosmeticCategory) => void;
+  
+  // Sponsorship negotiation system
+  getAvailableSponsorOffers: () => SponsorOffer[];
+  getNegotiatedSponsor: () => NegotiatedSponsor | null;
+  acceptSponsorOffer: (offer: SponsorOffer, negotiated: boolean) => boolean;
+  cancelSponsorContract: () => void;
+  incrementTournamentCount: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -227,19 +276,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
         darkMode: true,
         enableAnimations: true,
       },
-      careerStats: {
-        highGame: 0,
-        totalStrikes: 0,
-        totalSpares: 0,
-        totalTurkeys: 0,
-        totalDoubles: 0,
-        perfectGames: 0,
-        leagueWins: 0,
-        tournamentWins: 0,
-        totalEarnings: 0,
-        rivalWins: 0,
-        longestStrikeStreak: 0,
+      careerStats: getDefaultCareerStats(),
+      unlockedCosmetics: [],
+      equippedCosmetics: {
+        shoes: null,
+        gloves: null,
+        outfit: null,
+        ballSkin: null,
+        uiTheme: null,
       },
+      negotiatedSponsor: null,
+      tournamentsThisSeason: 0,
     };
 
     setGameState(prev => ({
@@ -428,6 +475,68 @@ export function GameProvider({ children }: { children: ReactNode }) {
     // 6. Weekly challenges reset happens automatically in getWeeklyChallenges
     // when week/season changes, so no action needed here
     
+    // 7. Negotiated sponsor processing
+    let newNegotiatedSponsor = currentProfile.negotiatedSponsor;
+    let newStats = { ...currentProfile.stats };
+    if (newNegotiatedSponsor) {
+      // Pay weekly stipend
+      newMoney += newNegotiatedSponsor.weeklyStipend;
+      
+      // Decrease weeks remaining
+      const weeksRemaining = newNegotiatedSponsor.weeksRemaining - 1;
+      
+      // Check if requirements are being met
+      const meetsAvg = currentProfile.bowlingAverage >= newNegotiatedSponsor.requirements.minAverage;
+      const meetsRep = currentProfile.stats.reputation >= newNegotiatedSponsor.requirements.minReputation;
+      const meetsTournaments = newNegotiatedSponsor.tournamentsEntered >= newNegotiatedSponsor.requirements.tournamentsPerSeason;
+      const requirementsMet = meetsAvg && meetsRep;
+      
+      if (weeksRemaining <= 0) {
+        // Contract expired
+        if (!meetsTournaments && newNegotiatedSponsor.penalties.canBeFired) {
+          newStats.reputation = Math.max(0, newStats.reputation - 10);
+        }
+        newNegotiatedSponsor = null;
+      } else {
+        // Apply weekly penalty if not meeting requirements
+        if (!requirementsMet) {
+          if (newNegotiatedSponsor.warningGiven && newNegotiatedSponsor.penalties.canBeFired) {
+            // Drop the sponsor after warning
+            newStats.reputation = Math.max(0, newStats.reputation - newNegotiatedSponsor.penalties.repLossPerWeek * 2);
+            newNegotiatedSponsor = null;
+          } else {
+            // Issue warning and apply penalty
+            newStats.reputation = Math.max(0, newStats.reputation - newNegotiatedSponsor.penalties.repLossPerWeek);
+            newNegotiatedSponsor = {
+              ...newNegotiatedSponsor,
+              weeksRemaining,
+              requirementsMet: false,
+              warningGiven: true,
+            };
+          }
+        } else {
+          newNegotiatedSponsor = {
+            ...newNegotiatedSponsor,
+            weeksRemaining,
+            requirementsMet: true,
+            warningGiven: false,
+          };
+        }
+      }
+    }
+    
+    // 8. Reset tournament count if new season
+    let newTournamentsThisSeason = currentProfile.tournamentsThisSeason ?? 0;
+    if (newSeason !== currentProfile.currentSeason) {
+      newTournamentsThisSeason = 0;
+      if (newNegotiatedSponsor) {
+        newNegotiatedSponsor = {
+          ...newNegotiatedSponsor,
+          tournamentsEntered: 0,
+        };
+      }
+    }
+    
     // Clamp energy to minimum 0
     newEnergy = Math.max(0, newEnergy);
     
@@ -439,6 +548,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       currentJob: newJob,
       activeSponsors: newSponsors,
       activeEffects: newEffects,
+      negotiatedSponsor: newNegotiatedSponsor,
+      stats: newStats,
+      tournamentsThisSeason: newTournamentsThisSeason,
     });
   }, [currentProfile, updateProfile]);
 
@@ -629,26 +741,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     
     // Update career stats if won against rival
+    const careerStats = currentProfile.careerStats ?? getDefaultCareerStats();
     if (won) {
-      const careerStats = currentProfile.careerStats ?? {
-        highGame: 0,
-        totalStrikes: 0,
-        totalSpares: 0,
-        totalTurkeys: 0,
-        totalDoubles: 0,
-        perfectGames: 0,
-        leagueWins: 0,
-        tournamentWins: 0,
-        totalEarnings: 0,
-        rivalWins: 0,
-        longestStrikeStreak: 0,
-      };
       updateProfile({
         rivalries,
         careerStats: { ...careerStats, rivalWins: careerStats.rivalWins + 1 },
       });
     } else {
-      updateProfile({ rivalries });
+      updateProfile({ 
+        rivalries,
+        careerStats: { ...careerStats, rivalLosses: careerStats.rivalLosses + 1 },
+      });
     }
   }, [currentProfile, updateProfile]);
 
@@ -660,19 +763,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const updateCareerStats = useCallback((updates: Partial<CareerStats>) => {
     if (!currentProfile) return;
-    const current = currentProfile.careerStats ?? {
-      highGame: 0,
-      totalStrikes: 0,
-      totalSpares: 0,
-      totalTurkeys: 0,
-      totalDoubles: 0,
-      perfectGames: 0,
-      leagueWins: 0,
-      tournamentWins: 0,
-      totalEarnings: 0,
-      rivalWins: 0,
-      longestStrikeStreak: 0,
-    };
+    const current = currentProfile.careerStats ?? getDefaultCareerStats();
     updateProfile({ careerStats: { ...current, ...updates } });
   }, [currentProfile, updateProfile]);
 
@@ -680,19 +771,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!currentProfile) return;
     
     const earned = [...(currentProfile.earnedAchievements ?? [])];
-    const careerStats = currentProfile.careerStats ?? {
-      highGame: 0,
-      totalStrikes: 0,
-      totalSpares: 0,
-      totalTurkeys: 0,
-      totalDoubles: 0,
-      perfectGames: 0,
-      leagueWins: 0,
-      tournamentWins: 0,
-      totalEarnings: 0,
-      rivalWins: 0,
-      longestStrikeStreak: 0,
-    };
+    const careerStats = currentProfile.careerStats ?? getDefaultCareerStats();
     
     const awardIfNotEarned = (id: AchievementId, condition: boolean) => {
       const existing = earned.find(a => a.id === id);
@@ -879,28 +958,31 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const retire = useCallback((): number => {
     if (!currentProfile || !canRetire()) return 0;
     
-    const careerStats = currentProfile.careerStats ?? {
-      highGame: 0,
-      totalStrikes: 0,
-      totalSpares: 0,
-      totalTurkeys: 0,
-      totalDoubles: 0,
-      perfectGames: 0,
-      leagueWins: 0,
-      tournamentWins: 0,
-      totalEarnings: 0,
-      rivalWins: 0,
-      longestStrikeStreak: 0,
-    };
+    const careerStats = currentProfile.careerStats ?? getDefaultCareerStats();
     
     // Calculate legacy points
     let points = 0;
-    points += currentProfile.currentSeason * 2; // 2 per season
-    points += careerStats.leagueWins * 5; // 5 per league win
-    points += careerStats.tournamentWins * 10; // 10 per tournament win
-    points += careerStats.perfectGames * 15; // 15 per perfect game
-    points += Math.floor(careerStats.totalEarnings / 10000); // 1 per $10k earned
-    points += currentProfile.isProfessional ? 20 : 0; // Bonus for going pro
+    points += currentProfile.currentSeason * 2;
+    points += careerStats.leagueWins * 5;
+    points += careerStats.tournamentWins * 10;
+    points += careerStats.perfectGames * 15;
+    points += Math.floor(careerStats.totalEarnings / 10000);
+    points += currentProfile.isProfessional ? 20 : 0;
+    
+    // Calculate percentages for expanded HoF
+    const strikePercentage = careerStats.totalFrames > 0 
+      ? Math.round((careerStats.strikeFrames / careerStats.totalFrames) * 100) 
+      : 0;
+    const sparePercentage = careerStats.totalFrames > 0 
+      ? Math.round((careerStats.spareFrames / careerStats.totalFrames) * 100) 
+      : 0;
+    
+    // Calculate rival record
+    const rivalRecord = { wins: careerStats.rivalWins, losses: careerStats.rivalLosses };
+    
+    // Count achievements and cosmetics
+    const achievementsEarned = (currentProfile.earnedAchievements ?? []).filter(a => a.earnedAt).length;
+    const cosmeticsCollected = (currentProfile.unlockedCosmetics ?? []).length;
     
     const hofEntry: HallOfFameEntry = {
       id: Date.now().toString(),
@@ -911,6 +993,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
       totalEarnings: careerStats.totalEarnings,
       perfectGames: careerStats.perfectGames,
       retiredAt: new Date().toISOString(),
+      highGame: careerStats.highGame,
+      highSeries: careerStats.highSeries,
+      totalGamesPlayed: currentProfile.totalGamesPlayed,
+      leagueWins: careerStats.leagueWins,
+      tournamentWins: careerStats.tournamentWins,
+      longestStrikeStreak: careerStats.longestStrikeStreak,
+      strikePercentage,
+      sparePercentage,
+      rivalRecord,
+      achievementsEarned,
+      cosmeticsCollected,
+      trait: currentProfile.trait,
+      bowlingStyle: currentProfile.bowlingStyle,
+      legacyPointsAwarded: points,
     };
     
     const legacy = getLegacyData();
@@ -955,6 +1051,213 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }));
     return true;
   }, [getLegacyData, setGameState]);
+
+  // ============================================
+  // COSMETICS SYSTEM
+  // ============================================
+  const getAvailableCosmetics = useCallback((): CosmeticItem[] => {
+    return AVAILABLE_COSMETICS;
+  }, []);
+
+  const getUnlockedCosmetics = useCallback((): string[] => {
+    return currentProfile?.unlockedCosmetics ?? [];
+  }, [currentProfile]);
+
+  const getEquippedCosmetics = useCallback((): EquippedCosmetics => {
+    return currentProfile?.equippedCosmetics ?? {
+      shoes: null,
+      gloves: null,
+      outfit: null,
+      ballSkin: null,
+      uiTheme: null,
+    };
+  }, [currentProfile]);
+
+  const canUnlockCosmetic = useCallback((cosmeticId: string): boolean => {
+    if (!currentProfile) return false;
+    const cosmetic = AVAILABLE_COSMETICS.find(c => c.id === cosmeticId);
+    if (!cosmetic) return false;
+    
+    const unlocked = currentProfile.unlockedCosmetics ?? [];
+    if (unlocked.includes(cosmeticId)) return false;
+    
+    const { unlockMethod, unlockRequirement } = cosmetic;
+    
+    switch (unlockMethod) {
+      case "purchase":
+        return currentProfile.money >= (unlockRequirement.price ?? 0);
+      case "reputation":
+        return currentProfile.stats.reputation >= (unlockRequirement.reputationRequired ?? 0);
+      case "achievement":
+        return hasAchievement(unlockRequirement.achievementId as AchievementId);
+      case "challenge":
+        return (currentProfile.cosmeticTokens ?? 0) >= 1;
+      case "legacy":
+        return getLegacyData().legacyPoints >= (unlockRequirement.legacyPointsCost ?? 0);
+      default:
+        return false;
+    }
+  }, [currentProfile, hasAchievement, getLegacyData]);
+
+  const unlockCosmetic = useCallback((cosmeticId: string): boolean => {
+    if (!currentProfile || !canUnlockCosmetic(cosmeticId)) return false;
+    
+    const cosmetic = AVAILABLE_COSMETICS.find(c => c.id === cosmeticId);
+    if (!cosmetic) return false;
+    
+    const { unlockMethod, unlockRequirement } = cosmetic;
+    const unlocked = [...(currentProfile.unlockedCosmetics ?? []), cosmeticId];
+    
+    switch (unlockMethod) {
+      case "purchase":
+        updateProfile({
+          unlockedCosmetics: unlocked,
+          money: currentProfile.money - (unlockRequirement.price ?? 0),
+        });
+        return true;
+      case "challenge":
+        updateProfile({
+          unlockedCosmetics: unlocked,
+          cosmeticTokens: (currentProfile.cosmeticTokens ?? 0) - 1,
+        });
+        return true;
+      case "legacy":
+        const legacy = getLegacyData();
+        setGameState(prev => ({
+          ...prev,
+          legacyData: {
+            ...legacy,
+            legacyPoints: legacy.legacyPoints - (unlockRequirement.legacyPointsCost ?? 0),
+          },
+        }));
+        updateProfile({ unlockedCosmetics: unlocked });
+        return true;
+      case "reputation":
+      case "achievement":
+        updateProfile({ unlockedCosmetics: unlocked });
+        return true;
+      default:
+        return false;
+    }
+  }, [currentProfile, canUnlockCosmetic, updateProfile, getLegacyData, setGameState]);
+
+  const equipCosmetic = useCallback((cosmeticId: string | null, category: CosmeticCategory) => {
+    if (!currentProfile) return;
+    
+    const equipped = currentProfile.equippedCosmetics ?? {
+      shoes: null,
+      gloves: null,
+      outfit: null,
+      ballSkin: null,
+      uiTheme: null,
+    };
+    
+    const categoryKey = category === "ball-skin" ? "ballSkin" : 
+                        category === "ui-theme" ? "uiTheme" : category;
+    
+    updateProfile({
+      equippedCosmetics: {
+        ...equipped,
+        [categoryKey]: cosmeticId,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  // ============================================
+  // SPONSORSHIP NEGOTIATION SYSTEM
+  // ============================================
+  const getAvailableSponsorOffers = useCallback((): SponsorOffer[] => {
+    if (!currentProfile || !currentProfile.isProfessional) return [];
+    if (currentProfile.negotiatedSponsor) return [];
+    
+    const playerAvg = currentProfile.bowlingAverage;
+    const playerRep = currentProfile.stats.reputation;
+    
+    return SPONSOR_TEMPLATES
+      .filter(t => playerAvg >= t.baseReqs.avg * 0.8 && playerRep >= t.baseReqs.rep * 0.7)
+      .map(t => ({
+        sponsor: { id: t.id, name: t.name, tier: t.tier },
+        safeOffer: {
+          weeklyStipend: Math.floor(t.baseStipend * 0.7),
+          tournamentBonus: Math.floor(t.baseBonus * 0.8),
+          requirements: {
+            minAverage: Math.floor(t.baseReqs.avg * 0.85),
+            minReputation: Math.floor(t.baseReqs.rep * 0.8),
+            tournamentsPerSeason: Math.max(1, t.baseReqs.tournaments - 1),
+          },
+          contractWeeks: 26,
+        },
+        negotiatedOffer: {
+          weeklyStipend: Math.floor(t.baseStipend * 1.3),
+          tournamentBonus: Math.floor(t.baseBonus * 1.2),
+          requirements: {
+            minAverage: t.baseReqs.avg,
+            minReputation: t.baseReqs.rep,
+            tournamentsPerSeason: t.baseReqs.tournaments + 1,
+          },
+          contractWeeks: 52,
+          negotiationSuccessChance: Math.min(90, 50 + currentProfile.stats.charisma),
+        },
+      }));
+  }, [currentProfile]);
+
+  const getNegotiatedSponsor = useCallback((): NegotiatedSponsor | null => {
+    return currentProfile?.negotiatedSponsor ?? null;
+  }, [currentProfile]);
+
+  const acceptSponsorOffer = useCallback((offer: SponsorOffer, negotiated: boolean): boolean => {
+    if (!currentProfile || currentProfile.negotiatedSponsor) return false;
+    
+    if (negotiated) {
+      const success = Math.random() * 100 < offer.negotiatedOffer.negotiationSuccessChance;
+      if (!success) return false;
+    }
+    
+    const terms = negotiated ? offer.negotiatedOffer : offer.safeOffer;
+    
+    const sponsor: NegotiatedSponsor = {
+      id: offer.sponsor.id,
+      name: offer.sponsor.name,
+      tier: offer.sponsor.tier,
+      weeklyStipend: terms.weeklyStipend,
+      tournamentBonus: terms.tournamentBonus,
+      requirements: terms.requirements,
+      penalties: {
+        repLossPerWeek: offer.sponsor.tier === "elite" ? 5 : 
+                        offer.sponsor.tier === "national" ? 3 : 
+                        offer.sponsor.tier === "regional" ? 2 : 1,
+        canBeFired: offer.sponsor.tier !== "local",
+      },
+      weeksRemaining: terms.contractWeeks,
+      tournamentsEntered: currentProfile.tournamentsThisSeason ?? 0,
+      requirementsMet: true,
+      warningGiven: false,
+    };
+    
+    updateProfile({ negotiatedSponsor: sponsor });
+    return true;
+  }, [currentProfile, updateProfile]);
+
+  const cancelSponsorContract = useCallback(() => {
+    if (!currentProfile) return;
+    updateProfile({ negotiatedSponsor: null });
+  }, [currentProfile, updateProfile]);
+
+  const incrementTournamentCount = useCallback(() => {
+    if (!currentProfile) return;
+    const count = (currentProfile.tournamentsThisSeason ?? 0) + 1;
+    updateProfile({ tournamentsThisSeason: count });
+    
+    // Also update negotiated sponsor tracking
+    if (currentProfile.negotiatedSponsor) {
+      updateProfile({
+        negotiatedSponsor: {
+          ...currentProfile.negotiatedSponsor,
+          tournamentsEntered: (currentProfile.negotiatedSponsor.tournamentsEntered ?? 0) + 1,
+        },
+      });
+    }
+  }, [currentProfile, updateProfile]);
 
   return (
     <GameContext.Provider value={{
@@ -1006,6 +1309,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
       canRetire,
       retire,
       applyLegacyBonus,
+      // Cosmetics system
+      getAvailableCosmetics,
+      getUnlockedCosmetics,
+      getEquippedCosmetics,
+      canUnlockCosmetic,
+      unlockCosmetic,
+      equipCosmetic,
+      // Sponsorship negotiation
+      getAvailableSponsorOffers,
+      getNegotiatedSponsor,
+      acceptSponsorOffer,
+      cancelSponsorContract,
+      incrementTournamentCount,
     }}>
       {children}
     </GameContext.Provider>
