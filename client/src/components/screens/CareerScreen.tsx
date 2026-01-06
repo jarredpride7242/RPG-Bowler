@@ -26,7 +26,10 @@ import {
   Calendar
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import { GAME_CONSTANTS, type Competition, type OilPattern } from "@shared/schema";
+import { GAME_CONSTANTS, type Competition, type OilPattern, type ActiveEvent, type Opponent } from "@shared/schema";
+import { EventLobby } from "@/components/EventLobby";
+import { PlayMatch } from "@/components/PlayMatch";
+import { simulateOpponentGame } from "@/lib/gameUtils";
 
 const AVAILABLE_COMPETITIONS: Competition[] = [
   {
@@ -113,6 +116,11 @@ export function CareerScreen() {
   const [showProDialog, setShowProDialog] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [competitionResult, setCompetitionResult] = useState<{ score: number; placement: number; prize: number } | null>(null);
+  const [activeEvent, setActiveEvent] = useState<ActiveEvent | null>(null);
+  const [showEventLobby, setShowEventLobby] = useState(false);
+  const [playingMatch, setPlayingMatch] = useState(false);
+  const [currentOpponents, setCurrentOpponents] = useState<Opponent[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   
   if (!currentProfile) return null;
   
@@ -140,46 +148,195 @@ export function CareerScreen() {
     return true;
   };
   
-  const simulateCompetition = (comp: Competition) => {
+  const enterCompetition = (comp: Competition) => {
     if (!canEnterCompetition(comp)) return;
     if (!spendMoney(comp.entryFee)) return;
     if (!useEnergy(comp.energyCost)) return;
     
-    let totalScore = 0;
-    for (let game = 0; game < comp.gamesCount; game++) {
+    setSelectedCompetition(comp);
+    setShowEventLobby(true);
+  };
+  
+  const handlePlayGame = (gameIndex: number, opponents: Opponent[], event: ActiveEvent) => {
+    setActiveEvent(event);
+    setCurrentOpponents(opponents);
+    setCurrentMatchIndex(gameIndex);
+    setPlayingMatch(true);
+    setShowEventLobby(false);
+  };
+  
+  const handleMatchComplete = (playerScore: number, opponentScore: number, opponentScoresForGame: number[]) => {
+    if (!selectedCompetition || !activeEvent) return;
+    
+    const newOpponentScores = activeEvent.opponentSeriesScores.map((scores, idx) => {
+      return [...scores, opponentScoresForGame[idx]];
+    });
+    
+    const newPlayerScores = [...activeEvent.playerSeriesScores, playerScore];
+    const newGameIndex = activeEvent.currentGameIndex + 1;
+    const isComplete = newGameIndex >= selectedCompetition.gamesCount;
+    
+    if (isComplete) {
+      const playerTotal = newPlayerScores.reduce((a, b) => a + b, 0);
+      const standings: Array<{ name: string; total: number }> = [
+        { name: "You", total: playerTotal }
+      ];
+      
+      activeEvent.opponents.forEach((opp, idx) => {
+        const oppScores = newOpponentScores[idx] || [];
+        const total = oppScores.reduce((a, b) => a + b, 0);
+        standings.push({ name: `${opp.firstName} ${opp.lastName}`, total });
+      });
+      
+      standings.sort((a, b) => b.total - a.total);
+      const placement = standings.findIndex(s => s.name === "You") + 1;
+      
+      let prize = 0;
+      if (placement === 1) prize = Math.round(selectedCompetition.prizePool * 0.4);
+      else if (placement === 2) prize = Math.round(selectedCompetition.prizePool * 0.25);
+      else if (placement === 3) prize = Math.round(selectedCompetition.prizePool * 0.15);
+      else if (placement <= 5) prize = Math.round(selectedCompetition.prizePool * 0.05);
+      
+      if (prize > 0) addMoney(prize);
+      
+      setActiveEvent({
+        ...activeEvent,
+        playerSeriesScores: newPlayerScores,
+        opponentSeriesScores: newOpponentScores,
+        currentGameIndex: newGameIndex,
+        isComplete: true,
+        finalPlacement: placement,
+        prizeWon: prize,
+      });
+      
+      setCompetitionResult({ 
+        score: Math.round(playerTotal / newPlayerScores.length), 
+        placement, 
+        prize 
+      });
+    } else {
+      setActiveEvent({
+        ...activeEvent,
+        playerSeriesScores: newPlayerScores,
+        opponentSeriesScores: newOpponentScores,
+        currentGameIndex: newGameIndex,
+      });
+    }
+    
+    setPlayingMatch(false);
+    setShowEventLobby(true);
+  };
+  
+  const handleMatchBack = () => {
+    setPlayingMatch(false);
+    setShowEventLobby(true);
+  };
+  
+  const handleSimGame = (gameIndex: number, opponents: Opponent[], event: ActiveEvent) => {
+    if (!selectedCompetition || !currentProfile) return;
+    
+    const baseScore = 100 + (currentProfile.bowlingAverage * 0.5) + (Math.random() * 40 - 20);
+    const gameScore = Math.round(Math.max(80, Math.min(300, baseScore)));
+    
+    addGameResult({
+      id: Date.now().toString(),
+      week: currentProfile.currentWeek,
+      season: currentProfile.currentSeason,
+      score: gameScore,
+      strikes: Math.floor(gameScore / 30),
+      spares: Math.floor((300 - gameScore) / 40),
+      opens: Math.floor((300 - gameScore) / 60),
+      competitionId: selectedCompetition.id,
+      competitionName: selectedCompetition.name,
+      oilPattern: selectedCompetition.oilPattern,
+      frames: [],
+    });
+    
+    setActiveEvent({
+      ...event,
+      playerSeriesScores: [...event.playerSeriesScores, gameScore],
+      currentGameIndex: event.currentGameIndex + 1,
+    });
+  };
+  
+  const handleSimAll = (opponents: Opponent[], event: ActiveEvent) => {
+    if (!selectedCompetition || !currentProfile) return;
+    
+    const gamesRemaining = selectedCompetition.gamesCount - event.currentGameIndex;
+    const newPlayerScores: number[] = [...event.playerSeriesScores];
+    
+    for (let i = 0; i < gamesRemaining; i++) {
       const baseScore = 100 + (currentProfile.bowlingAverage * 0.5) + (Math.random() * 40 - 20);
       const gameScore = Math.round(Math.max(80, Math.min(300, baseScore)));
-      totalScore += gameScore;
+      newPlayerScores.push(gameScore);
       
       addGameResult({
-        id: Date.now().toString() + game,
+        id: Date.now().toString() + i,
         week: currentProfile.currentWeek,
         season: currentProfile.currentSeason,
         score: gameScore,
         strikes: Math.floor(gameScore / 30),
         spares: Math.floor((300 - gameScore) / 40),
         opens: Math.floor((300 - gameScore) / 60),
-        competitionId: comp.id,
-        competitionName: comp.name,
-        oilPattern: comp.oilPattern,
+        competitionId: selectedCompetition.id,
+        competitionName: selectedCompetition.name,
+        oilPattern: selectedCompetition.oilPattern,
         frames: [],
       });
     }
     
-    const avgScore = totalScore / comp.gamesCount;
-    const placement = avgScore >= 200 ? 1 : avgScore >= 180 ? Math.floor(Math.random() * 3) + 1 : 
-                     avgScore >= 160 ? Math.floor(Math.random() * 5) + 3 : Math.floor(Math.random() * 10) + 5;
+    const playerTotal = newPlayerScores.reduce((a, b) => a + b, 0);
+    const standings: Array<{ name: string; total: number }> = [
+      { name: "You", total: playerTotal }
+    ];
+    
+    opponents.forEach((opp, idx) => {
+      const oppScores = event.opponentSeriesScores[idx] || [];
+      const total = oppScores.reduce((a, b) => a + b, 0);
+      standings.push({ name: `${opp.firstName} ${opp.lastName}`, total });
+    });
+    
+    standings.sort((a, b) => b.total - a.total);
+    const placement = standings.findIndex(s => s.name === "You") + 1;
     
     let prize = 0;
-    if (placement === 1) prize = Math.round(comp.prizePool * 0.4);
-    else if (placement === 2) prize = Math.round(comp.prizePool * 0.25);
-    else if (placement === 3) prize = Math.round(comp.prizePool * 0.15);
-    else if (placement <= 5) prize = Math.round(comp.prizePool * 0.05);
+    if (placement === 1) prize = Math.round(selectedCompetition.prizePool * 0.4);
+    else if (placement === 2) prize = Math.round(selectedCompetition.prizePool * 0.25);
+    else if (placement === 3) prize = Math.round(selectedCompetition.prizePool * 0.15);
+    else if (placement <= 5) prize = Math.round(selectedCompetition.prizePool * 0.05);
     
     if (prize > 0) addMoney(prize);
     
-    setCompetitionResult({ score: Math.round(avgScore), placement, prize });
-    setSelectedCompetition(comp);
+    setActiveEvent({
+      ...event,
+      playerSeriesScores: newPlayerScores,
+      currentGameIndex: selectedCompetition.gamesCount,
+      isComplete: true,
+      finalPlacement: placement,
+      prizeWon: prize,
+    });
+    
+    setCompetitionResult({ 
+      score: Math.round(playerTotal / newPlayerScores.length), 
+      placement, 
+      prize 
+    });
+  };
+  
+  const handleEventExit = () => {
+    setShowEventLobby(false);
+    setSelectedCompetition(null);
+    setActiveEvent(null);
+  };
+  
+  const handleEventComplete = (placement: number, prize: number, playerScores: number[], opponentScores: number[][]) => {
+    if (prize > 0) addMoney(prize);
+    
+    const avgScore = playerScores.length > 0 
+      ? Math.round(playerScores.reduce((a, b) => a + b, 0) / playerScores.length)
+      : 0;
+    
+    setCompetitionResult({ score: avgScore, placement, prize });
   };
   
   const getOilPatternLabel = (pattern: OilPattern) => {
@@ -196,6 +353,34 @@ export function CareerScreen() {
 
   const amateurComps = AVAILABLE_COMPETITIONS.filter(c => !c.requiresPro);
   const proComps = AVAILABLE_COMPETITIONS.filter(c => c.requiresPro);
+
+  if (playingMatch && selectedCompetition && activeEvent) {
+    return (
+      <PlayMatch
+        competition={selectedCompetition}
+        opponents={activeEvent.opponents}
+        gameIndex={activeEvent.currentGameIndex}
+        onComplete={handleMatchComplete}
+        onForfeit={handleMatchBack}
+      />
+    );
+  }
+  
+  if (showEventLobby && selectedCompetition) {
+    return (
+      <EventLobby
+        competition={selectedCompetition}
+        playerAverage={currentProfile.bowlingAverage}
+        playerEnergy={currentProfile.energy}
+        onPlayGame={handlePlayGame}
+        onSimGame={handleSimGame}
+        onSimAll={handleSimAll}
+        onExit={handleEventExit}
+        onComplete={handleEventComplete}
+        initialEvent={activeEvent}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 pb-24 px-4 pt-4">
@@ -334,7 +519,7 @@ export function CareerScreen() {
                         <Button 
                           size="sm" 
                           disabled={!canEnter}
-                          onClick={() => simulateCompetition(comp)}
+                          onClick={() => enterCompetition(comp)}
                           data-testid={`button-enter-${comp.id}`}
                         >
                           Enter
@@ -405,7 +590,7 @@ export function CareerScreen() {
                         <Button 
                           size="sm" 
                           disabled={!canEnter}
-                          onClick={() => simulateCompetition(comp)}
+                          onClick={() => enterCompetition(comp)}
                           data-testid={`button-enter-${comp.id}`}
                         >
                           Enter
