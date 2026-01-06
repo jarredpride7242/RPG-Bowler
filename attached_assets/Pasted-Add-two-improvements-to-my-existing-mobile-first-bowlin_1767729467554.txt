@@ -1,0 +1,34 @@
+Add two improvements to my existing mobile-first bowling RPG (HTML/CSS/vanilla JS) without breaking current saves or UI navigation. Keep localStorage save slots and add safe migration defaults for new fields.
+
+Part A — Random Weekly Events (runs once per week)
+	•	Add a generateWeeklyEvent() system that triggers once when advancing the week (not multiple times).
+	•	Use weighted probabilities so common events happen often and rare events sometimes. Add constants:
+	•	EVENT_RATE (chance any event happens weekly)
+	•	MAJOR_EVENT_RATE (chance event is major)
+	•	Create at least 12 events across categories:
+Performance: hot streak, slump, clutch confidence, spare focus
+Money/Jobs: side gig offer, pay raise chance, unexpected bill, job drama
+Equipment: pro shop discount, new shipment, ball damage/maintenance cost
+Bowling: lane condition surprise, local clinic invite, rivalry challenge
+Social: new dating match, argument/drama, supportive partner boost
+	•	Events should show in a mobile modal with 1–3 choices (Accept/Decline/Spend money/Spend energy).
+	•	Events can apply temporary effects for N weeks; add an “Active Effects” panel with remaining weeks.
+	•	Save event history and active effects in localStorage.
+
+Part B — More Interactive Dating Tab (dating-app style)
+
+Replace the current basic dating tab with a more interactive one:
+	•	A swipe-style or card-style list of matches with: name, age, bio, compatibility tags.
+	•	When you match, unlock a Chat thread with 2–4 message choices per step (branching).
+	•	Chat outcomes affect relationship points and can lead to a Date action.
+	•	Dates cost energy + money and have outcomes (good/neutral/bad) based on Charisma, mood, and randomness.
+	•	Relationship levels (0–100) unlock perks:
+	•	small energy recovery bonus
+	•	small mental toughness bonus
+	•	occasional gift/help event
+	•	Add “Status” states: Talking / Dating / Exclusive / Broken Up.
+	•	Add jealousy/drama events sometimes (but not too punishing).
+	•	Show relationship history and current partner on the Profile/Home screen.
+	•	Ensure everything is mobile-friendly with large buttons and simple UI.
+
+Deliverables: Update index.html, style.css, script.js to implement weekly events + interactive dating features, with clear comments and tuning constants. Keep existing saves working via migration defaults.

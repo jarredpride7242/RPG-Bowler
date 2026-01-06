@@ -28,6 +28,13 @@ export const GAME_CONSTANTS = {
   LEAGUE_SIZE: 8,
   TOURNAMENT_SIZE: 16,
   UPSET_FACTOR: 0.15, // Variance factor for opponent performance
+  // Weekly Random Events
+  EVENT_RATE: 0.65, // 65% chance any event happens weekly
+  MAJOR_EVENT_RATE: 0.15, // 15% chance the event is a major one
+  // Dating system
+  DATE_ENERGY_COST: 15,
+  DATE_BASE_MONEY_COST: 50,
+  RELATIONSHIP_PERK_THRESHOLDS: { tier1: 25, tier2: 50, tier3: 75 },
 };
 
 // ============================================
@@ -155,7 +162,7 @@ export const jobSchema = z.object({
 export type Job = z.infer<typeof jobSchema>;
 
 // ============================================
-// RELATIONSHIP
+// RELATIONSHIP (Legacy - keeping for compatibility)
 // ============================================
 export const relationshipSchema = z.object({
   id: z.string(),
@@ -168,6 +175,544 @@ export const relationshipSchema = z.object({
 });
 
 export type Relationship = z.infer<typeof relationshipSchema>;
+
+// ============================================
+// WEEKLY RANDOM EVENTS SYSTEM
+// ============================================
+export const weeklyEventCategorySchema = z.enum([
+  "performance", "money", "equipment", "bowling", "social"
+]);
+export type WeeklyEventCategory = z.infer<typeof weeklyEventCategorySchema>;
+
+export const eventChoiceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  cost: z.object({
+    money: z.number().optional(),
+    energy: z.number().optional(),
+  }).optional(),
+  outcome: z.object({
+    money: z.number().optional(),
+    energy: z.number().optional(),
+    reputation: z.number().optional(),
+    statBonus: z.object({
+      stat: z.string(),
+      amount: z.number(),
+      weeks: z.number(),
+    }).optional(),
+    statPenalty: z.object({
+      stat: z.string(),
+      amount: z.number(),
+      weeks: z.number(),
+    }).optional(),
+    relationshipChange: z.number().optional(),
+  }),
+});
+
+export type EventChoice = z.infer<typeof eventChoiceSchema>;
+
+export const weeklyEventTemplateSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  category: weeklyEventCategorySchema,
+  weight: z.number(), // Higher = more common
+  isMajor: z.boolean(),
+  choices: z.array(eventChoiceSchema),
+  requiresPro: z.boolean().optional(),
+  requiresRelationship: z.boolean().optional(),
+});
+
+export type WeeklyEventTemplate = z.infer<typeof weeklyEventTemplateSchema>;
+
+export const triggeredEventSchema = z.object({
+  eventId: z.string(),
+  title: z.string(),
+  description: z.string(),
+  category: weeklyEventCategorySchema,
+  choices: z.array(eventChoiceSchema),
+  weekTriggered: z.number(),
+  resolved: z.boolean(),
+  choiceMade: z.string().optional(),
+});
+
+export type TriggeredEvent = z.infer<typeof triggeredEventSchema>;
+
+export const activeEventEffectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  effectType: z.enum(["buff", "debuff"]),
+  stat: z.string().optional(),
+  amount: z.number(),
+  weeksRemaining: z.number(),
+  sourceEventId: z.string(),
+});
+
+export type ActiveEventEffect = z.infer<typeof activeEventEffectSchema>;
+
+// ============================================
+// ENHANCED DATING SYSTEM
+// ============================================
+export const datingStatusSchema = z.enum(["none", "talking", "dating", "exclusive", "broken-up"]);
+export type DatingStatus = z.infer<typeof datingStatusSchema>;
+
+export const datingMatchSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  age: z.number(),
+  bio: z.string(),
+  compatibilityTags: z.array(z.string()),
+  avatarSeed: z.number(), // For procedural avatar generation
+  personality: z.enum(["outgoing", "reserved", "adventurous", "homebody", "ambitious", "laid-back"]),
+  interests: z.array(z.string()),
+  matchScore: z.number(), // 0-100 based on player charisma
+});
+
+export type DatingMatch = z.infer<typeof datingMatchSchema>;
+
+export const chatMessageSchema = z.object({
+  id: z.string(),
+  sender: z.enum(["player", "match"]),
+  text: z.string(),
+  timestamp: z.number(),
+});
+
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+export const chatChoiceSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  relationshipChange: z.number(),
+  nextMessageId: z.string().optional(),
+  unlocksDate: z.boolean().optional(),
+  isFlirty: z.boolean().optional(),
+  requiresCharisma: z.number().optional(),
+});
+
+export type ChatChoice = z.infer<typeof chatChoiceSchema>;
+
+export const chatStepSchema = z.object({
+  id: z.string(),
+  matchMessage: z.string(),
+  playerChoices: z.array(chatChoiceSchema),
+  isTerminal: z.boolean().optional(),
+});
+
+export type ChatStep = z.infer<typeof chatStepSchema>;
+
+export const activeDatingProfileSchema = z.object({
+  matchId: z.string(),
+  match: datingMatchSchema,
+  status: datingStatusSchema,
+  relationshipLevel: z.number().min(0).max(100),
+  chatHistory: z.array(chatMessageSchema),
+  currentChatStep: z.string().optional(),
+  datesTaken: z.number(),
+  lastInteractionWeek: z.number(),
+  isCurrentPartner: z.boolean(),
+  jealousyLevel: z.number().min(0).max(100).optional(),
+  weekStarted: z.number(),
+});
+
+export type ActiveDatingProfile = z.infer<typeof activeDatingProfileSchema>;
+
+export const dateOutcomeSchema = z.enum(["great", "good", "neutral", "bad", "disaster"]);
+export type DateOutcome = z.infer<typeof dateOutcomeSchema>;
+
+export const datingSystemStateSchema = z.object({
+  availableMatches: z.array(datingMatchSchema),
+  activeProfiles: z.array(activeDatingProfileSchema),
+  currentPartnerId: z.string().nullable(),
+  relationshipHistory: z.array(z.object({
+    matchId: z.string(),
+    matchName: z.string(),
+    peakLevel: z.number(),
+    weekStarted: z.number(),
+    weekEnded: z.number().optional(),
+    endReason: z.string().optional(),
+  })),
+  lastMatchRefreshWeek: z.number(),
+});
+
+export type DatingSystemState = z.infer<typeof datingSystemStateSchema>;
+
+// Weekly Event Templates (12+ events across categories)
+export const WEEKLY_EVENT_TEMPLATES: WeeklyEventTemplate[] = [
+  // PERFORMANCE EVENTS
+  {
+    id: "hot-streak",
+    title: "Hot Streak!",
+    description: "You're in the zone! Your practice sessions have been exceptional lately.",
+    category: "performance",
+    weight: 15,
+    isMajor: false,
+    choices: [
+      {
+        id: "capitalize",
+        label: "Capitalize (+5 Accuracy for 3 weeks)",
+        outcome: { statBonus: { stat: "accuracy", amount: 5, weeks: 3 } },
+      },
+      {
+        id: "rest",
+        label: "Take it easy (recover 20 energy)",
+        outcome: { energy: 20 },
+      },
+    ],
+  },
+  {
+    id: "slump",
+    title: "Rough Patch",
+    description: "Nothing is clicking. Your throws feel off and confidence is shaken.",
+    category: "performance",
+    weight: 12,
+    isMajor: false,
+    choices: [
+      {
+        id: "push-through",
+        label: "Push through (risk: -3 consistency, 2 weeks)",
+        outcome: { statPenalty: { stat: "consistency", amount: 3, weeks: 2 } },
+      },
+      {
+        id: "take-break",
+        label: "Take a mental break (-15 energy, clear head)",
+        cost: { energy: 15 },
+        outcome: { statBonus: { stat: "mentalToughness", amount: 3, weeks: 2 } },
+      },
+    ],
+  },
+  {
+    id: "clutch-confidence",
+    title: "Clutch Moment",
+    description: "A tough spare in practice gives you a confidence boost!",
+    category: "performance",
+    weight: 10,
+    isMajor: false,
+    choices: [
+      {
+        id: "embrace",
+        label: "Embrace the feeling (+4 Mental Toughness, 2 weeks)",
+        outcome: { statBonus: { stat: "mentalToughness", amount: 4, weeks: 2 } },
+      },
+    ],
+  },
+  {
+    id: "spare-focus",
+    title: "Spare Practice Breakthrough",
+    description: "Your spare shooting practice has paid off!",
+    category: "performance",
+    weight: 10,
+    isMajor: false,
+    choices: [
+      {
+        id: "continue",
+        label: "Keep practicing (+5 Spare Shooting, 3 weeks)",
+        cost: { energy: 10 },
+        outcome: { statBonus: { stat: "spareShooting", amount: 5, weeks: 3 } },
+      },
+      {
+        id: "skip",
+        label: "Save energy for competition",
+        outcome: {},
+      },
+    ],
+  },
+  // MONEY/JOBS EVENTS
+  {
+    id: "side-gig",
+    title: "Side Gig Offer",
+    description: "A local bowling alley wants you to help coach beginners for extra cash.",
+    category: "money",
+    weight: 12,
+    isMajor: false,
+    choices: [
+      {
+        id: "accept",
+        label: "Accept (+$150, -20 energy)",
+        cost: { energy: 20 },
+        outcome: { money: 150, reputation: 2 },
+      },
+      {
+        id: "decline",
+        label: "Decline (focus on your game)",
+        outcome: {},
+      },
+    ],
+  },
+  {
+    id: "pay-raise",
+    title: "Job Performance Review",
+    description: "Your employer notices your dedication. A raise might be on the table.",
+    category: "money",
+    weight: 8,
+    isMajor: true,
+    choices: [
+      {
+        id: "negotiate",
+        label: "Negotiate hard (50% chance of +$100/week or nothing)",
+        outcome: { money: 100 },
+      },
+      {
+        id: "grateful",
+        label: "Accept graciously (+$50 bonus, +reputation)",
+        outcome: { money: 50, reputation: 3 },
+      },
+    ],
+  },
+  {
+    id: "unexpected-bill",
+    title: "Unexpected Expense",
+    description: "Car trouble! You need to pay for repairs.",
+    category: "money",
+    weight: 10,
+    isMajor: false,
+    choices: [
+      {
+        id: "pay-full",
+        label: "Pay in full (-$200)",
+        outcome: { money: -200 },
+      },
+      {
+        id: "defer",
+        label: "Defer repairs (-10 energy/week, 2 weeks)",
+        outcome: { statPenalty: { stat: "stamina", amount: 5, weeks: 2 } },
+      },
+    ],
+  },
+  // EQUIPMENT EVENTS
+  {
+    id: "pro-shop-discount",
+    title: "Pro Shop Sale!",
+    description: "The local pro shop is having a flash sale on equipment.",
+    category: "equipment",
+    weight: 10,
+    isMajor: false,
+    choices: [
+      {
+        id: "browse",
+        label: "Check it out (shop discount this week)",
+        outcome: { money: 50 },
+      },
+      {
+        id: "pass",
+        label: "Not interested",
+        outcome: {},
+      },
+    ],
+  },
+  {
+    id: "ball-maintenance",
+    title: "Ball Maintenance Needed",
+    description: "Your ball needs resurfacing to maintain performance.",
+    category: "equipment",
+    weight: 8,
+    isMajor: false,
+    choices: [
+      {
+        id: "resurface",
+        label: "Get it resurfaced (-$75, +3 Control, 4 weeks)",
+        cost: { money: 75 },
+        outcome: { statBonus: { stat: "hookControl", amount: 3, weeks: 4 } },
+      },
+      {
+        id: "delay",
+        label: "Bowl as-is (-2 Control, 2 weeks)",
+        outcome: { statPenalty: { stat: "hookControl", amount: 2, weeks: 2 } },
+      },
+    ],
+  },
+  // BOWLING EVENTS
+  {
+    id: "lane-surprise",
+    title: "Lane Condition Change",
+    description: "The lanes at your regular alley have been freshly oiled!",
+    category: "bowling",
+    weight: 10,
+    isMajor: false,
+    choices: [
+      {
+        id: "adapt",
+        label: "Practice adapting (+4 Lane Reading, 2 weeks)",
+        cost: { energy: 15 },
+        outcome: { statBonus: { stat: "laneReading", amount: 4, weeks: 2 } },
+      },
+      {
+        id: "wait",
+        label: "Wait for normal conditions",
+        outcome: {},
+      },
+    ],
+  },
+  {
+    id: "clinic-invite",
+    title: "Local Clinic Invitation",
+    description: "A pro bowler is hosting a clinic nearby!",
+    category: "bowling",
+    weight: 6,
+    isMajor: true,
+    choices: [
+      {
+        id: "attend",
+        label: "Attend (-$100, -25 energy, major stat boost)",
+        cost: { money: 100, energy: 25 },
+        outcome: { statBonus: { stat: "accuracy", amount: 6, weeks: 4 }, reputation: 5 },
+      },
+      {
+        id: "skip",
+        label: "Can't make it",
+        outcome: {},
+      },
+    ],
+  },
+  {
+    id: "rivalry-challenge",
+    title: "Rival Challenge!",
+    description: "A local bowler has called you out for a head-to-head match!",
+    category: "bowling",
+    weight: 8,
+    isMajor: true,
+    choices: [
+      {
+        id: "accept-challenge",
+        label: "Accept the challenge (+reputation if you win)",
+        cost: { energy: 20 },
+        outcome: { reputation: 5 },
+      },
+      {
+        id: "ignore",
+        label: "Ignore them (-2 reputation)",
+        outcome: { reputation: -2 },
+      },
+    ],
+  },
+  // SOCIAL EVENTS
+  {
+    id: "new-match",
+    title: "New Dating Match!",
+    description: "Someone new has shown interest in you!",
+    category: "social",
+    weight: 8,
+    isMajor: false,
+    choices: [
+      {
+        id: "explore",
+        label: "Check them out",
+        outcome: {},
+      },
+      {
+        id: "focus-bowling",
+        label: "Too busy with bowling",
+        outcome: {},
+      },
+    ],
+  },
+  {
+    id: "partner-support",
+    title: "Supportive Partner",
+    description: "Your partner shows up to support you at practice!",
+    category: "social",
+    weight: 8,
+    isMajor: false,
+    requiresRelationship: true,
+    choices: [
+      {
+        id: "appreciate",
+        label: "Show appreciation (+5 Mental Toughness, 2 weeks)",
+        outcome: { statBonus: { stat: "mentalToughness", amount: 5, weeks: 2 }, relationshipChange: 5 },
+      },
+    ],
+  },
+  {
+    id: "relationship-drama",
+    title: "Relationship Tension",
+    description: "Your partner is upset you've been spending so much time bowling.",
+    category: "social",
+    weight: 6,
+    isMajor: false,
+    requiresRelationship: true,
+    choices: [
+      {
+        id: "apologize",
+        label: "Apologize and make time (-15 energy)",
+        cost: { energy: 15 },
+        outcome: { relationshipChange: 10 },
+      },
+      {
+        id: "explain",
+        label: "Explain your passion (50/50 outcome)",
+        outcome: { relationshipChange: -5 },
+      },
+      {
+        id: "dismiss",
+        label: "Dismiss concerns (-15 relationship)",
+        outcome: { relationshipChange: -15 },
+      },
+    ],
+  },
+];
+
+// Dating conversation templates
+export const DATING_CHAT_TEMPLATES: ChatStep[] = [
+  {
+    id: "intro",
+    matchMessage: "Hey! I saw we matched. What got you into bowling?",
+    playerChoices: [
+      { id: "passionate", text: "It's my passion! I've been bowling competitively for years.", relationshipChange: 3, nextMessageId: "passionate-response" },
+      { id: "casual", text: "Just a fun hobby that turned into something more.", relationshipChange: 2, nextMessageId: "casual-response" },
+      { id: "flirty", text: "Looking for strikes on and off the lanes.", relationshipChange: 4, isFlirty: true, requiresCharisma: 50, nextMessageId: "flirty-response" },
+    ],
+  },
+  {
+    id: "passionate-response",
+    matchMessage: "That's awesome! I love people who are dedicated to their craft. What's your highest score?",
+    playerChoices: [
+      { id: "humble", text: "I've had some good games, still working to improve!", relationshipChange: 2, nextMessageId: "date-ask" },
+      { id: "confident", text: "I've rolled a few great ones. Maybe I can show you sometime?", relationshipChange: 4, unlocksDate: true, nextMessageId: "date-ask" },
+    ],
+  },
+  {
+    id: "casual-response",
+    matchMessage: "That's cool! I've always wanted to try it. Maybe you could teach me?",
+    playerChoices: [
+      { id: "offer", text: "I'd love to show you the basics!", relationshipChange: 4, unlocksDate: true, nextMessageId: "date-ask" },
+      { id: "shy", text: "Sure, if you're interested sometime.", relationshipChange: 2, nextMessageId: "date-ask" },
+    ],
+  },
+  {
+    id: "flirty-response",
+    matchMessage: "Smooth! I like confidence. When can we hang out?",
+    playerChoices: [
+      { id: "soon", text: "How about this weekend?", relationshipChange: 5, unlocksDate: true, nextMessageId: "date-ask" },
+      { id: "play-cool", text: "Let's chat a bit more first.", relationshipChange: 2, nextMessageId: "date-ask" },
+    ],
+  },
+  {
+    id: "date-ask",
+    matchMessage: "I'd really like to see you in person. Want to grab coffee or something?",
+    playerChoices: [
+      { id: "yes", text: "I'd love that!", relationshipChange: 5, unlocksDate: true },
+      { id: "bowling-date", text: "How about a bowling date instead?", relationshipChange: 6, unlocksDate: true },
+      { id: "not-yet", text: "Maybe soon, still getting to know you.", relationshipChange: 1 },
+    ],
+    isTerminal: true,
+  },
+];
+
+// Names for procedural match generation
+export const DATING_FIRST_NAMES = [
+  "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Quinn", "Avery",
+  "Jamie", "Sam", "Charlie", "Drew", "Skyler", "Reese", "Parker", "Blake"
+];
+
+export const DATING_INTERESTS = [
+  "sports", "music", "movies", "travel", "food", "fitness", "gaming", "art",
+  "reading", "hiking", "cooking", "photography", "dancing", "animals", "nature"
+];
+
+export const DATING_COMPATIBILITY_TAGS = [
+  "competitive", "laid-back", "adventurous", "homebody", "social", "quiet",
+  "ambitious", "creative", "athletic", "intellectual", "romantic", "practical"
+];
 
 // ============================================
 // PROPERTY
@@ -1255,6 +1800,13 @@ export const playerProfileSchema = z.object({
   leagueChampionships: z.number().optional(),
   // Bowling alley environment customization
   alleyEnvironment: alleyEnvironmentSchema.optional(),
+  // Weekly random events system
+  weeklyEventHistory: z.array(triggeredEventSchema).optional(),
+  activeEventEffects: z.array(activeEventEffectSchema).optional(),
+  pendingEvent: triggeredEventSchema.nullable().optional(),
+  lastEventWeek: z.number().optional(),
+  // Enhanced dating system
+  datingState: datingSystemStateSchema.optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
