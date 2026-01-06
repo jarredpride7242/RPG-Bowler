@@ -113,7 +113,7 @@ const AVAILABLE_COMPETITIONS: Competition[] = [
 ];
 
 export function CareerScreen() {
-  const { currentProfile, goProfessional, spendMoney, useEnergy, addMoney, addGameResult } = useGame();
+  const { currentProfile, goProfessional, spendMoney, useEnergy, addMoney, addGameResult, updateProfile } = useGame();
   const [showProDialog, setShowProDialog] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [competitionResult, setCompetitionResult] = useState<{ score: number; placement: number; prize: number } | null>(null);
@@ -122,6 +122,8 @@ export function CareerScreen() {
   const [playingMatch, setPlayingMatch] = useState(false);
   const [currentOpponents, setCurrentOpponents] = useState<Opponent[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [playingLeagueWeek, setPlayingLeagueWeek] = useState(false);
+  const [leagueGameIndex, setLeagueGameIndex] = useState(0);
   
   if (!currentProfile) return null;
   
@@ -355,6 +357,203 @@ export function CareerScreen() {
   const amateurComps = AVAILABLE_COMPETITIONS.filter(c => !c.requiresPro);
   const proComps = AVAILABLE_COMPETITIONS.filter(c => c.requiresPro);
 
+  const handlePlayLeagueWeek = (league: ActiveLeague) => {
+    if (!currentProfile.activeLeague) return;
+    setPlayingLeagueWeek(true);
+    setLeagueGameIndex(0);
+  };
+
+  const handlePlayTournamentGame = (tournament: ActiveTournament) => {
+    console.log("Play tournament:", tournament);
+  };
+
+  if (playingLeagueWeek && currentProfile.activeLeague) {
+    const league = currentProfile.activeLeague;
+    const currentWeekNum = league.currentWeek;
+    const existingWeekResult = league.weeklyResults.find(r => r.week === currentWeekNum);
+    const opponentsExcludingPlayer = league.standings.filter(s => !s.isPlayer);
+    const opponentIndex = (currentWeekNum - 1) % opponentsExcludingPlayer.length;
+    const opponent = opponentsExcludingPlayer[opponentIndex];
+    
+    const playerScoresSoFar = existingWeekResult?.playerScores || [];
+    const oppScoresSoFar = existingWeekResult?.opponentScores || [];
+    
+    return (
+      <div className="space-y-4 pb-24 px-4 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl font-bold">{league.name}</h1>
+          <Badge variant="outline">Week {league.currentWeek}</Badge>
+        </div>
+        
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-medium">vs. {opponent?.name || "Opponent"}</p>
+                <p className="text-sm text-muted-foreground">
+                  Avg: {opponent?.average || 0} | Record: {opponent?.wins || 0}-{opponent?.losses || 0}
+                </p>
+              </div>
+              <Badge>Game {leagueGameIndex + 1} of 3</Badge>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {[0, 1, 2].map((gameIdx) => {
+                const playerScore = playerScoresSoFar[gameIdx];
+                const oppScore = oppScoresSoFar[gameIdx];
+                const isPlayed = playerScore !== undefined;
+                const isCurrent = gameIdx === leagueGameIndex;
+                
+                return (
+                  <div 
+                    key={gameIdx}
+                    className={`p-3 rounded-md text-center ${
+                      isPlayed ? "bg-muted" : isCurrent ? "bg-primary/10 border border-primary" : "bg-muted/50"
+                    }`}
+                  >
+                    <p className="text-xs text-muted-foreground mb-1">Game {gameIdx + 1}</p>
+                    {isPlayed ? (
+                      <>
+                        <p className="font-bold">{playerScore}</p>
+                        <p className="text-xs text-muted-foreground">vs {oppScore}</p>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">-</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1"
+                onClick={() => {
+                  setPlayingLeagueWeek(false);
+                }}
+                variant="outline"
+                data-testid="button-league-back"
+              >
+                Back
+              </Button>
+              <Button 
+                className="flex-1"
+                onClick={() => {
+                  const baseScore = 100 + (currentProfile.bowlingAverage * 0.5) + (Math.random() * 40 - 20);
+                  const playerScore = Math.round(Math.max(80, Math.min(300, baseScore)));
+                  const oppBase = (opponent?.average || 150) + (Math.random() * 30 - 15);
+                  const oppScore = Math.round(Math.max(80, Math.min(300, oppBase)));
+                  
+                  const newPlayerScores = [...playerScoresSoFar, playerScore];
+                  const newOppScores = [...oppScoresSoFar, oppScore];
+                  
+                  addGameResult({
+                    id: Date.now().toString(),
+                    week: currentProfile.currentWeek,
+                    season: currentProfile.currentSeason,
+                    score: playerScore,
+                    strikes: Math.floor(playerScore / 30),
+                    spares: Math.floor((300 - playerScore) / 40),
+                    opens: Math.floor((300 - playerScore) / 60),
+                    competitionId: league.id,
+                    competitionName: league.name,
+                    oilPattern: league.oilPattern,
+                    frames: [],
+                  });
+                  
+                  if (leagueGameIndex >= 2) {
+                    const totalPlayer = newPlayerScores.reduce((a: number, b: number) => a + b, 0);
+                    const totalOpp = newOppScores.reduce((a: number, b: number) => a + b, 0);
+                    const playerWon = totalPlayer > totalOpp;
+                    const playerPoints = playerWon ? 2 : (totalPlayer === totalOpp ? 1 : 0);
+                    
+                    const newWeekResult = {
+                      week: currentWeekNum,
+                      playerScores: newPlayerScores,
+                      playerTotal: totalPlayer,
+                      opponentName: opponent?.name || "Opponent",
+                      opponentScores: newOppScores,
+                      opponentTotal: totalOpp,
+                      won: playerWon,
+                      pointsEarned: playerPoints,
+                    };
+                    
+                    const updatedWeeklyResults = existingWeekResult 
+                      ? league.weeklyResults.map(r => r.week === currentWeekNum ? newWeekResult : r)
+                      : [...league.weeklyResults, newWeekResult];
+                    
+                    const updatedStandings = league.standings.map(s => {
+                      if (s.isPlayer) {
+                        return {
+                          ...s,
+                          wins: s.wins + (playerWon ? 1 : 0),
+                          losses: s.losses + (playerWon ? 0 : 1),
+                          points: s.points + playerPoints,
+                          totalPins: s.totalPins + totalPlayer,
+                          gamesPlayed: s.gamesPlayed + 3,
+                          average: Math.round((s.totalPins + totalPlayer) / (s.gamesPlayed + 3)),
+                        };
+                      }
+                      if (s.bowlerId === opponent?.bowlerId) {
+                        return {
+                          ...s,
+                          wins: s.wins + (playerWon ? 0 : 1),
+                          losses: s.losses + (playerWon ? 1 : 0),
+                          points: s.points + (2 - playerPoints),
+                          totalPins: s.totalPins + totalOpp,
+                          gamesPlayed: s.gamesPlayed + 3,
+                          average: Math.round((s.totalPins + totalOpp) / (s.gamesPlayed + 3)),
+                        };
+                      }
+                      return s;
+                    });
+                    
+                    const updatedLeague: ActiveLeague = {
+                      ...league,
+                      weeklyResults: updatedWeeklyResults,
+                      standings: updatedStandings,
+                      currentWeek: league.currentWeek + 1,
+                      isComplete: league.currentWeek >= league.seasonLength,
+                    };
+                    
+                    updateProfile({ activeLeague: updatedLeague });
+                    setPlayingLeagueWeek(false);
+                  } else {
+                    const partialWeekResult = {
+                      week: currentWeekNum,
+                      playerScores: newPlayerScores,
+                      playerTotal: 0,
+                      opponentName: opponent?.name || "Opponent",
+                      opponentScores: newOppScores,
+                      opponentTotal: 0,
+                      won: false,
+                      pointsEarned: 0,
+                    };
+                    
+                    const updatedWeeklyResults = existingWeekResult 
+                      ? league.weeklyResults.map(r => r.week === currentWeekNum ? partialWeekResult : r)
+                      : [...league.weeklyResults, partialWeekResult];
+                    
+                    updateProfile({
+                      activeLeague: {
+                        ...league,
+                        weeklyResults: updatedWeeklyResults,
+                      }
+                    });
+                    setLeagueGameIndex(prev => prev + 1);
+                  }
+                }}
+                data-testid="button-league-bowl"
+              >
+                Bowl Game {leagueGameIndex + 1}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (playingMatch && selectedCompetition && activeEvent) {
     return (
       <PlayMatch
@@ -466,12 +665,8 @@ export function CareerScreen() {
         
         <TabsContent value="competitions" className="space-y-4 mt-4">
           <CompetitionsHub 
-            onPlayLeagueGame={(league) => {
-              console.log("Play league game:", league);
-            }}
-            onPlayTournamentGame={(tournament) => {
-              console.log("Play tournament game:", tournament);
-            }}
+            onPlayLeagueGame={handlePlayLeagueWeek}
+            onPlayTournamentGame={handlePlayTournamentGame}
           />
         </TabsContent>
         
