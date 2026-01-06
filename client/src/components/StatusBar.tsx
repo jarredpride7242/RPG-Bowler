@@ -9,7 +9,9 @@ export function StatusBar() {
   
   if (!currentProfile) return null;
   
-  const energyPercent = (currentProfile.energy / GAME_CONSTANTS.MAX_ENERGY) * 100;
+  // Calculate max energy including property bonus
+  const maxEnergy = GAME_CONSTANTS.MAX_ENERGY + (currentProfile.currentProperty?.energyBonus ?? 0);
+  const energyPercent = (currentProfile.energy / maxEnergy) * 100;
   
   return (
     <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-sm border-b border-card-border px-4 py-2">
@@ -24,7 +26,7 @@ export function StatusBar() {
               />
             </div>
             <span className="text-xs font-medium tabular-nums text-muted-foreground">
-              {currentProfile.energy}
+              {currentProfile.energy}/{maxEnergy}
             </span>
           </div>
         </div>

@@ -201,21 +201,48 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
             This Week
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             Season {currentProfile.currentSeason}, Week {currentProfile.currentWeek}
           </p>
-          <div className="mt-2 space-y-1">
-            <p className="text-sm">No scheduled events</p>
-            <Button 
-              variant="link" 
-              className="p-0 h-auto text-sm"
-              onClick={() => onNavigate("career")}
-            >
-              Browse competitions
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
+          
+          <div className="bg-muted/50 rounded-md p-3 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Next week preview:</p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-chart-3" />
+                Energy resets to
+              </span>
+              <span className="font-medium tabular-nums">
+                {GAME_CONSTANTS.MAX_ENERGY + (currentProfile.currentProperty?.energyBonus ?? 0)}
+                {currentProfile.currentJob && (
+                  <span className="text-destructive ml-1">
+                    -{currentProfile.currentJob.energyCost} (job)
+                  </span>
+                )}
+              </span>
+            </div>
+            {currentProfile.currentJob && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5" />
+                  Job pay
+                </span>
+                <span className="font-medium text-green-600 dark:text-green-400 tabular-nums">
+                  +${currentProfile.currentJob.weeklyPay}
+                </span>
+              </div>
+            )}
           </div>
+          
+          <Button 
+            variant="ghost" 
+            className="p-0 h-auto text-sm"
+            onClick={() => onNavigate("career")}
+          >
+            Browse competitions
+            <ChevronRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
         </CardContent>
       </Card>
     </div>

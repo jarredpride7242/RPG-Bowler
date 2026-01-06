@@ -263,15 +263,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
       newSeason += 1;
     }
     
-    let energyRefill = GAME_CONSTANTS.ENERGY_REFILL_PER_WEEK;
+    // Calculate max energy (base + property bonus)
+    let maxEnergy = GAME_CONSTANTS.MAX_ENERGY;
+    if (currentProfile.currentProperty) {
+      maxEnergy += currentProfile.currentProperty.energyBonus;
+    }
+    
+    // Reset energy to max at start of week
+    let newEnergy = maxEnergy;
+    
+    // Apply job weekly energy cost and pay
     let jobPay = 0;
-    let jobEnergyCost = 0;
     let newJob = currentProfile.currentJob;
     
     if (currentProfile.currentJob) {
       jobPay = currentProfile.currentJob.weeklyPay;
-      jobEnergyCost = currentProfile.currentJob.energyCost;
+      // Subtract job energy cost once at week start
+      newEnergy -= currentProfile.currentJob.energyCost;
       
+      // Handle contract duration
       if (currentProfile.currentJob.weeksRemaining !== undefined) {
         const weeksRemaining = currentProfile.currentJob.weeksRemaining - 1;
         if (weeksRemaining <= 0) {
@@ -282,19 +292,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    if (currentProfile.currentProperty) {
-      energyRefill += currentProfile.currentProperty.energyBonus;
-    }
-    
-    const newEnergy = Math.min(
-      GAME_CONSTANTS.MAX_ENERGY, 
-      currentProfile.energy + energyRefill - jobEnergyCost
-    );
+    // Clamp energy to minimum 0
+    newEnergy = Math.max(0, newEnergy);
     
     updateProfile({
       currentWeek: newWeek,
       currentSeason: newSeason,
-      energy: Math.max(0, newEnergy),
+      energy: newEnergy,
       money: currentProfile.money + jobPay,
       currentJob: newJob,
     });
