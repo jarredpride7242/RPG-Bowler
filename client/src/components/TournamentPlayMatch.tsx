@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Medal } from "lucide-react";
+import { Trophy, Medal, ArrowRight } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { PlayMatch } from "./PlayMatch";
-import type { ActiveTournament, Competition, Opponent, TournamentResult } from "@shared/schema";
+import type { ActiveTournament, Competition, Opponent, TournamentResult, BracketMatch } from "@shared/schema";
 import { TOURNAMENT_DEFINITIONS } from "@shared/schema";
 
 interface TournamentPlayMatchProps {
@@ -16,32 +16,93 @@ interface TournamentPlayMatchProps {
 
 export function TournamentPlayMatch({ tournament, onComplete, onBack }: TournamentPlayMatchProps) {
   const { currentProfile } = useGame();
-  const [currentGameIndex, setCurrentGameIndex] = useState(tournament.currentGame - 1);
-  const [gameScores, setGameScores] = useState<number[]>([]);
-  const [opponentScores, setOpponentScores] = useState<number[]>([]);
+  
+  // For series format: track games within the series
+  const [seriesGameIndex, setSeriesGameIndex] = useState(0);
+  const [seriesScores, setSeriesScores] = useState<number[]>([]);
+  
+  // For bracket format: track match result
+  const [bracketMatchComplete, setBracketMatchComplete] = useState(false);
+  const [bracketMatchWon, setBracketMatchWon] = useState(false);
+  const [bracketMatchScore, setBracketMatchScore] = useState<{ player: number; opponent: number } | null>(null);
+  
+  // Tournament completion state
   const [tournamentComplete, setTournamentComplete] = useState(false);
   const [finalPlacement, setFinalPlacement] = useState<number | null>(null);
+  // Initialize from saved scores or empty
+  const [allGameScores, setAllGameScores] = useState<number[]>(
+    tournament.playerGameScores || []
+  );
   
   if (!currentProfile) return null;
   
   const tierDef = TOURNAMENT_DEFINITIONS[tournament.tier];
   const totalGames = tournament.totalGames;
-  const gamesPlayed = gameScores.length;
-  const currentGame = gamesPlayed;
+  const isBracket = tournament.format === "bracket";
   
-  const currentOpponent: Opponent = {
-    id: "field",
-    firstName: "Field",
-    lastName: "Average",
-    bowlingAverage: tierDef.minAverage + 20,
-    bowlingStyle: "one-handed",
-    handedness: "right",
-    stats: {
-      throwPower: 60, accuracy: 65, hookControl: 60, consistency: 70,
-      stamina: 60, mentalToughness: 60, speedControl: 60, equipmentKnowledge: 50,
-      revRate: 60, laneReading: 60, spareShooting: 65, charisma: 50, reputation: 40,
-    },
+  // Calculate bracket info
+  const maxRounds = isBracket ? Math.ceil(Math.log2(tournament.entrants.length)) : 1;
+  const currentRound = tournament.currentRound;
+  
+  // Get round name for bracket
+  const getRoundName = (round: number, maxRounds: number) => {
+    const roundsFromFinal = maxRounds - round + 1;
+    if (roundsFromFinal === 1) return "Finals";
+    if (roundsFromFinal === 2) return "Semi-Finals";
+    if (roundsFromFinal === 3) return "Quarter-Finals";
+    return `Round ${round}`;
   };
+  
+  // Get opponent for current match - select based on current round
+  const getOpponent = (): Opponent => {
+    // Filter out player from entrants
+    const opponents = tournament.entrants.filter(e => !e.isPlayer);
+    
+    if (opponents.length === 0) {
+      // Fallback opponent
+      return {
+        id: "field",
+        firstName: "Opponent",
+        lastName: "",
+        bowlingAverage: tierDef.minAverage + 20,
+        bowlingStyle: "one-handed",
+        handedness: "right",
+        stats: {
+          throwPower: 60, accuracy: 65, hookControl: 60, consistency: 70,
+          stamina: 60, mentalToughness: 60, speedControl: 60, equipmentKnowledge: 50,
+          revRate: 60, laneReading: 60, spareShooting: 65, charisma: 50, reputation: 40,
+        },
+      };
+    }
+    
+    // For bracket: use current round to pick opponent deterministically
+    // Each round gets a different opponent from the pool
+    const opponentIndex = (currentRound - 1) % opponents.length;
+    const opponentEntrant = opponents[opponentIndex];
+    
+    // Higher rounds face tougher opponents (higher average)
+    const roundBonus = (currentRound - 1) * 5;
+    const adjustedAverage = Math.min(220, opponentEntrant.bowlingAverage + roundBonus);
+    
+    return {
+      id: opponentEntrant.id,
+      firstName: opponentEntrant.name.split(" ")[0],
+      lastName: opponentEntrant.name.split(" ").slice(1).join(" ") || "",
+      bowlingAverage: adjustedAverage,
+      bowlingStyle: "one-handed",
+      handedness: "right",
+      stats: {
+        throwPower: 60 + roundBonus, 
+        accuracy: 65 + roundBonus, 
+        hookControl: 60 + roundBonus, 
+        consistency: 70 + roundBonus,
+        stamina: 60, mentalToughness: 60 + roundBonus, speedControl: 60, equipmentKnowledge: 50,
+        revRate: 60, laneReading: 60 + roundBonus, spareShooting: 65 + roundBonus, charisma: 50, reputation: 40,
+      },
+    };
+  };
+  
+  const currentOpponent = getOpponent();
   
   const tierToCompTier = (tier: string) => {
     switch (tier) {
@@ -67,35 +128,21 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
   };
   
   const handleGameComplete = (playerScore: number, opponentScore: number) => {
-    const newScores = [...gameScores, playerScore];
-    const newOppScores = [...opponentScores, opponentScore];
-    setGameScores(newScores);
-    setOpponentScores(newOppScores);
-    
-    if (tournament.format === "bracket") {
-      const playerWon = playerScore > opponentScore;
-      if (!playerWon) {
-        const placement = Math.ceil(tournament.entrants.length / Math.pow(2, tournament.currentRound));
-        setFinalPlacement(placement);
-        setTournamentComplete(true);
-      } else {
-        const nextRound = tournament.currentRound + 1;
-        const maxRounds = Math.ceil(Math.log2(tournament.entrants.length));
-        
-        if (nextRound > maxRounds) {
-          setFinalPlacement(1);
-          setTournamentComplete(true);
-        } else {
-          const updatedTournament: ActiveTournament = {
-            ...tournament,
-            currentRound: nextRound,
-            currentGame: tournament.currentGame + 1,
-          };
-          onComplete(updatedTournament);
-        }
-      }
+    if (isBracket) {
+      // Bracket: one game per match
+      const won = playerScore > opponentScore;
+      setBracketMatchScore({ player: playerScore, opponent: opponentScore });
+      setBracketMatchWon(won);
+      setBracketMatchComplete(true);
+      setAllGameScores(prev => [...prev, playerScore]);
     } else {
-      if (currentGame >= totalGames - 1) {
+      // Series: multiple games
+      const newScores = [...seriesScores, playerScore];
+      setSeriesScores(newScores);
+      setAllGameScores(prev => [...prev, playerScore]);
+      
+      if (seriesGameIndex >= totalGames - 1) {
+        // Series complete - calculate placement
         const totalPins = newScores.reduce((a, b) => a + b, 0);
         const avgScore = tierDef.minAverage + 20;
         const fieldScores = Array.from({ length: tournament.entrants.length - 1 }, () => {
@@ -108,13 +155,43 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
         setFinalPlacement(placement);
         setTournamentComplete(true);
       } else {
-        setCurrentGameIndex(prev => prev + 1);
+        setSeriesGameIndex(prev => prev + 1);
       }
     }
   };
   
+  const handleAdvanceBracket = () => {
+    if (!bracketMatchWon) {
+      // Lost - tournament over
+      const placement = Math.ceil(tournament.entrants.length / Math.pow(2, currentRound));
+      setFinalPlacement(placement);
+      setTournamentComplete(true);
+      setBracketMatchComplete(false);
+    } else if (currentRound >= maxRounds) {
+      // Won finals - tournament complete
+      setFinalPlacement(1);
+      setTournamentComplete(true);
+      setBracketMatchComplete(false);
+    } else {
+      // Advance to next round - stay in component
+      setBracketMatchComplete(false);
+      setBracketMatchWon(false);
+      setBracketMatchScore(null);
+      
+      // Update tournament in parent but stay in play mode
+      // Include allGameScores so they persist across rounds
+      const updatedTournament: ActiveTournament = {
+        ...tournament,
+        currentRound: currentRound + 1,
+        currentGame: tournament.currentGame + 1,
+        playerGameScores: allGameScores,
+      };
+      onComplete(updatedTournament);
+    }
+  };
+  
   const handleFinishTournament = () => {
-    const totalPins = gameScores.reduce((a, b) => a + b, 0);
+    const totalPins = allGameScores.reduce((a, b) => a + b, 0);
     const placement = finalPlacement || tournament.entrants.length;
     
     let prize = 0;
@@ -131,7 +208,7 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
       placement,
       totalEntrants: tournament.entrants.length,
       totalPins,
-      gamesPlayed: gameScores.length,
+      gamesPlayed: allGameScores.length,
       prizeMoney: prize,
       week: currentProfile.currentWeek,
     };
@@ -139,8 +216,89 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
     onComplete(null, result);
   };
   
+  // Bracket match result screen
+  if (isBracket && bracketMatchComplete && bracketMatchScore) {
+    const roundName = getRoundName(currentRound, maxRounds);
+    const isChampionship = currentRound >= maxRounds && bracketMatchWon;
+    
+    return (
+      <div className="space-y-4 pb-24 px-4 pt-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold">{tournament.name}</h1>
+          <Badge variant="outline">{roundName}</Badge>
+        </div>
+        
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="text-center py-4">
+              {bracketMatchWon ? (
+                isChampionship ? (
+                  <div className="flex flex-col items-center gap-2 text-chart-3">
+                    <Trophy className="w-12 h-12" />
+                    <span className="text-2xl font-bold">Tournament Champion!</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-chart-3">
+                    <Trophy className="w-8 h-8" />
+                    <span className="text-xl font-bold">Match Won!</span>
+                  </div>
+                )
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <span className="text-xl font-bold">Match Lost</span>
+                  <span className="text-sm">Eliminated in {roundName}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center justify-center gap-4 py-2">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{bracketMatchScore.player}</p>
+                <p className="text-xs text-muted-foreground">You</p>
+              </div>
+              <span className="text-muted-foreground">vs</span>
+              <div className="text-center">
+                <p className="text-2xl font-bold">{bracketMatchScore.opponent}</p>
+                <p className="text-xs text-muted-foreground">{currentOpponent.firstName}</p>
+              </div>
+            </div>
+            
+            {allGameScores.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">All Games:</p>
+                <div className="flex flex-wrap gap-2">
+                  {allGameScores.map((score, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      R{idx + 1}: {score}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <Button 
+              className="w-full" 
+              onClick={handleAdvanceBracket}
+              data-testid="button-bracket-continue"
+            >
+              {bracketMatchWon && currentRound < maxRounds ? (
+                <>
+                  Advance to {getRoundName(currentRound + 1, maxRounds)}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              ) : (
+                "View Results"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Tournament complete screen
   if (tournamentComplete) {
-    const totalPins = gameScores.reduce((a, b) => a + b, 0);
+    const totalPins = allGameScores.reduce((a, b) => a + b, 0);
     const placement = finalPlacement || tournament.entrants.length;
     const isWinner = placement === 1;
     const isPodium = placement <= 3;
@@ -184,8 +342,8 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
                 <p className="text-xl font-bold">{totalPins}</p>
               </div>
               <div className="p-3 bg-muted rounded-md">
-                <p className="text-xs text-muted-foreground">Games</p>
-                <p className="text-xl font-bold">{gameScores.length}</p>
+                <p className="text-xs text-muted-foreground">Games Played</p>
+                <p className="text-xl font-bold">{allGameScores.length}</p>
               </div>
             </div>
             
@@ -196,16 +354,18 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
               </div>
             )}
             
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Game Scores:</p>
-              <div className="flex flex-wrap gap-2">
-                {gameScores.map((score, idx) => (
-                  <Badge key={idx} variant="secondary">
-                    G{idx + 1}: {score}
-                  </Badge>
-                ))}
+            {allGameScores.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Game Scores:</p>
+                <div className="flex flex-wrap gap-2">
+                  {allGameScores.map((score, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      {isBracket ? `R${idx + 1}` : `G${idx + 1}`}: {score}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
             
             <Button className="w-full" onClick={handleFinishTournament} data-testid="button-finish-tournament">
               Finish Tournament
@@ -216,29 +376,30 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
     );
   }
   
+  // Active game screen
   return (
     <div className="space-y-2">
       <div className="px-4 pt-2">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <Badge variant="outline">{tournament.name}</Badge>
-            {tournament.format === "bracket" && (
-              <Badge>Round {tournament.currentRound}</Badge>
+            {isBracket && (
+              <Badge>{getRoundName(currentRound, maxRounds)}</Badge>
             )}
           </div>
           <Badge variant="secondary">
-            {tournament.format === "series" 
-              ? `Game ${currentGame + 1} of ${totalGames}`
-              : `Match ${tournament.currentRound}`
+            {isBracket 
+              ? `vs ${currentOpponent.firstName}`
+              : `Game ${seriesGameIndex + 1} of ${totalGames}`
             }
           </Badge>
         </div>
         
-        {gameScores.length > 0 && (
+        {allGameScores.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap">
-            {gameScores.map((score, idx) => (
+            {allGameScores.map((score, idx) => (
               <div key={idx} className="text-xs bg-muted px-2 py-1 rounded">
-                G{idx + 1}: {score}
+                {isBracket ? `R${idx + 1}` : `G${idx + 1}`}: {score}
               </div>
             ))}
           </div>
@@ -246,10 +407,10 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
       </div>
       
       <PlayMatch
-        key={`game-${currentGame}-round-${tournament.currentRound}`}
+        key={`game-${isBracket ? currentRound : seriesGameIndex}`}
         competition={competition}
         opponents={[currentOpponent]}
-        gameIndex={currentGame}
+        gameIndex={isBracket ? currentRound - 1 : seriesGameIndex}
         onComplete={handleGameComplete}
         onForfeit={onBack}
       />

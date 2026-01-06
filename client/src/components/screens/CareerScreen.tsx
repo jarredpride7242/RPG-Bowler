@@ -376,6 +376,7 @@ export function CareerScreen() {
 
   const handleTournamentComplete = (updatedTournament: ActiveTournament | null, result?: any) => {
     if (result) {
+      // Tournament fully complete with result
       if (result.prizeMoney > 0) {
         addMoney(result.prizeMoney);
       }
@@ -384,10 +385,15 @@ export function CareerScreen() {
         activeTournament: null,
         tournamentHistory: [...history, result],
       });
+      setPlayingTournament(false);
     } else if (updatedTournament) {
+      // Advancing to next round in bracket - stay in tournament
       updateProfile({ activeTournament: updatedTournament });
+      // Don't exit - stay in playing mode
+    } else {
+      // Exiting without result
+      setPlayingTournament(false);
     }
-    setPlayingTournament(false);
   };
 
   if (playingLeagueWeek && currentProfile.activeLeague) {
@@ -403,6 +409,7 @@ export function CareerScreen() {
   if (playingTournament && currentProfile.activeTournament) {
     return (
       <TournamentPlayMatch
+        key={`tournament-round-${currentProfile.activeTournament.currentRound}`}
         tournament={currentProfile.activeTournament}
         onComplete={handleTournamentComplete}
         onBack={() => setPlayingTournament(false)}

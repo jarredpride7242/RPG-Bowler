@@ -415,6 +415,7 @@ export const activeTournamentSchema = z.object({
   oilPattern: oilPatternSchema,
   prizePool: z.number(),
   entryFee: z.number(),
+  playerGameScores: z.array(z.number()).optional(),
 });
 
 export type ActiveTournament = z.infer<typeof activeTournamentSchema>;
