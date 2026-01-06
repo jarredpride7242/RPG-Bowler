@@ -58,7 +58,8 @@ import {
   DATING_FIRST_NAMES,
   DATING_INTERESTS,
   DATING_COMPATIBILITY_TAGS,
-  DATING_CHAT_TEMPLATES
+  DATING_CHAT_TEMPLATES,
+  BOWLING_ALLEY_CONSTANTS
 } from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
@@ -740,7 +741,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
       newPendingEvent = generateWeeklyEvent(tempProfile);
     }
     
-    // 10. Dating system - relationship decay if not interacting
+    // 10. Bowling alley profit
+    let newOwnedBowlingAlley = currentProfile.ownedBowlingAlley;
+    if (newOwnedBowlingAlley) {
+      const profit = newOwnedBowlingAlley.weeklyProfit;
+      newMoney += profit;
+      newOwnedBowlingAlley = {
+        ...newOwnedBowlingAlley,
+        totalProfitEarned: newOwnedBowlingAlley.totalProfitEarned + profit,
+      };
+    }
+    
+    // 11. Dating system - relationship decay if not interacting
     let newDatingState = currentProfile.datingState;
     if (newDatingState) {
       const updatedProfiles = newDatingState.activeProfiles.map(p => {
@@ -775,6 +787,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       activeEventEffects: newActiveEventEffects,
       pendingEvent: newPendingEvent,
       datingState: newDatingState,
+      ownedBowlingAlley: newOwnedBowlingAlley,
     });
   }, [currentProfile, updateProfile]);
 
@@ -1879,6 +1892,61 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return { mentalToughness, energyRecovery };
   }, [getCurrentPartner]);
 
+  // Bowling Alley Ownership
+  const canPurchaseBowlingAlley = useCallback((): boolean => {
+    if (!currentProfile) return false;
+    return (
+      currentProfile.isProfessional &&
+      currentProfile.money >= BOWLING_ALLEY_CONSTANTS.PURCHASE_COST &&
+      !currentProfile.ownedBowlingAlley
+    );
+  }, [currentProfile]);
+
+  const purchaseBowlingAlley = useCallback((name: string): boolean => {
+    if (!currentProfile || !canPurchaseBowlingAlley()) return false;
+    
+    const baseProfit = BOWLING_ALLEY_CONSTANTS.BASE_WEEKLY_PROFIT;
+    
+    updateProfile({
+      money: currentProfile.money - BOWLING_ALLEY_CONSTANTS.PURCHASE_COST,
+      ownedBowlingAlley: {
+        name,
+        purchaseWeek: currentProfile.currentWeek,
+        purchaseSeason: currentProfile.currentSeason,
+        upgradeLevel: 0,
+        totalProfitEarned: 0,
+        weeklyProfit: baseProfit,
+      },
+    });
+    return true;
+  }, [currentProfile, canPurchaseBowlingAlley, updateProfile]);
+
+  const upgradeBowlingAlley = useCallback((): boolean => {
+    if (!currentProfile?.ownedBowlingAlley) return false;
+    
+    const currentLevel = currentProfile.ownedBowlingAlley.upgradeLevel;
+    if (currentLevel >= BOWLING_ALLEY_CONSTANTS.MAX_UPGRADE_LEVEL) return false;
+    
+    const upgradeCost = BOWLING_ALLEY_CONSTANTS.UPGRADE_COSTS[currentLevel + 1];
+    if (currentProfile.money < upgradeCost) return false;
+    
+    const newLevel = currentLevel + 1;
+    const newProfit = Math.floor(
+      BOWLING_ALLEY_CONSTANTS.BASE_WEEKLY_PROFIT * 
+      BOWLING_ALLEY_CONSTANTS.PROFIT_MULTIPLIERS[newLevel]
+    );
+    
+    updateProfile({
+      money: currentProfile.money - upgradeCost,
+      ownedBowlingAlley: {
+        ...currentProfile.ownedBowlingAlley,
+        upgradeLevel: newLevel,
+        weeklyProfit: newProfit,
+      },
+    });
+    return true;
+  }, [currentProfile, updateProfile]);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -1958,6 +2026,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       breakUp,
       getCurrentPartner,
       getRelationshipPerks,
+      // Bowling Alley Ownership
+      purchaseBowlingAlley,
+      upgradeBowlingAlley,
+      canPurchaseBowlingAlley,
     }}>
       {children}
     </GameContext.Provider>
