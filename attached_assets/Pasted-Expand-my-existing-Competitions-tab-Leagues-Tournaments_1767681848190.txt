@@ -1,0 +1,95 @@
+Expand my existing Competitions tab (Leagues + Tournaments) in my mobile-first bowling RPG (HTML/CSS/vanilla JS). Do not break current saves or UI; extend the existing working systems. Keep localStorage save slots working and add safe save migration defaults for new fields.
+
+Goals
+	•	Make competitions feel deeper and more structured (like a sports management sim).
+	•	Add clearer formats, tiers, standings, scheduling, and results history.
+	•	Keep the current quick-sim behavior as an option, but improve the “competition hub” experience.
+
+⸻
+
+1) Competitions Hub UI (better navigation)
+
+Update Competitions tab into a hub with two sections:
+	•	Leagues
+	•	Tournaments
+
+Each section should show:
+	•	Upcoming scheduled event (next league night / next tournament round)
+	•	Entry requirements (avg, reputation, pro status if applicable)
+	•	Entry fees + energy costs
+	•	Current standings / progress summary
+
+Add a “Competition Details” screen for each event that includes:
+	•	Format, oil pattern, tier, rewards
+	•	Opponent list or field list
+	•	Buttons: Play Next Game, Sim Next Game, and optional Sim All
+	•	Results history for that competition
+
+⸻
+
+2) League System Expansion
+
+Add multiple league types and richer league mechanics:
+
+League Types (at least 3):
+	•	Casual House League (easy)
+	•	Competitive Sport League (harder patterns, higher payouts)
+	•	Pro League (locked behind going pro + 200 avg requirement)
+
+League Formats (choose and implement consistently):
+	•	Weekly 3-game series vs one opponent OR
+	•	Weekly “field night” where you bowl a 3-game series and rankings update
+
+League Features:
+	•	Generate a league field of 8–16 opponents with names + skill profiles
+	•	Track standings with:
+	•	Points or Wins/Losses
+	•	Total pins / average
+	•	Add “Week X of Y” season structure (ex: 10–14 weeks)
+	•	End-of-season playoffs or championship night (top 4 or top 8)
+	•	Weekly recap: “You moved to 3rd place” etc.
+	•	Allow leaving a league (with confirmation and penalty if mid-season)
+
+⸻
+
+3) Tournament System Expansion
+
+Add multiple tournament tiers and formats:
+
+Tournament Tiers:
+	•	Local Open (low requirements)
+	•	Regional (higher)
+	•	Major / Pro (locked behind pro status)
+
+Tournament Formats (implement at least 2):
+	•	3–6 game series (total pins leaderboard)
+	•	Bracket match-play (head-to-head; winner advances)
+
+Tournament Features:
+	•	Generate a field of 12–40 opponents depending on tier
+	•	Allow multiple rounds (Qualifying → Cut → Finals)
+	•	Show a leaderboard after each round
+	•	Provide clear payouts:
+	•	Entry fee
+	•	Prize pool distribution by finish position
+	•	Add a “Tournament History” page with past finishes and earnings
+
+⸻
+
+4) Opponent Generation & Difficulty Scaling
+
+Improve opponent generation so it feels realistic and varied:
+	•	Opponents have a skill profile tied to their average range
+	•	Higher tiers produce tougher opponents
+	•	Add variance so upsets happen but are not constant
+	•	Add a few recurring “named” opponents (possible rivals later)
+
+⸻
+
+5) Oil Patterns and Event Conditions
+
+Each league/tournament should specify:
+	•	Oil pattern (house, sport, short, long, heavy, dry)
+	•	Difficulty modifier
+	•	Optional lane transition intensity
+Display this clearly in the event details screen and apply it in simulation.

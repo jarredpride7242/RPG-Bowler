@@ -70,6 +70,24 @@ Preferred communication style: Simple, everyday language.
 - **Career Summary Cards**: Detailed statistics display for retired bowlers
 - **Legacy Points**: Calculated from career accomplishments, unlock prestige bonuses
 
+#### Expanded Competitions Hub
+- **League System**: 3 league types (Casual House League, Competitive Sport League, Pro League)
+  - Weekly 3-game series vs scheduled opponents
+  - Season standings with points, wins, averages
+  - 10-14 week seasons with playoffs
+  - League championships tracked in profile
+- **Tournament System**: 3 tiers (Local Open, Regional Championship, Major Pro)
+  - Two formats: Series (total pins) and Bracket (match play)
+  - Qualifying rounds with cutline advancement
+  - Prize pool distribution by placement
+  - Tournament history tracking
+- **Oil Patterns**: 6 types with difficulty ratings (House, Short, Sport, Long, Heavy, Dry)
+  - Each pattern affects scoring difficulty
+  - Displayed in competition details
+- **Opponent Generation**: Skill-based NPCs with averages tied to competition tier
+  - Varied names and stats per event
+  - Consistent scheduling via stable opponent order
+
 ### Profile Screen Tabs (8 total)
 1. Overview - Player stats and settings
 2. Achievements - Detailed achievement tracking with filters and career records

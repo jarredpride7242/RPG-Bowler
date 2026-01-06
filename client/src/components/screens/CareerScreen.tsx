@@ -26,10 +26,11 @@ import {
   Calendar
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import { GAME_CONSTANTS, type Competition, type OilPattern, type ActiveEvent, type Opponent } from "@shared/schema";
+import { GAME_CONSTANTS, type Competition, type OilPattern, type ActiveEvent, type Opponent, type ActiveLeague, type ActiveTournament } from "@shared/schema";
 import { EventLobby } from "@/components/EventLobby";
 import { PlayMatch } from "@/components/PlayMatch";
 import { simulateOpponentGame } from "@/lib/gameUtils";
+import { CompetitionsHub } from "@/components/CompetitionsHub";
 
 const AVAILABLE_COMPETITIONS: Competition[] = [
   {
@@ -464,144 +465,14 @@ export function CareerScreen() {
         </TabsList>
         
         <TabsContent value="competitions" className="space-y-4 mt-4">
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground">Amateur Events</h2>
-            {amateurComps.map((comp) => {
-              const canEnter = canEnterCompetition(comp);
-              const isLocked = currentProfile.isProfessional;
-              
-              return (
-                <Card key={comp.id} className={isLocked ? "opacity-60" : ""}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium truncate">{comp.name}</span>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {comp.type}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Target className="w-3.5 h-3.5" />
-                            {getOilPatternLabel(comp.oilPattern)}
-                          </span>
-                          <span>{comp.gamesCount} games</span>
-                        </div>
-                        {comp.minAverage && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Min avg: {comp.minAverage}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-chart-3">${comp.prizePool.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Prize Pool</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Coins className="w-3.5 h-3.5" /> ${comp.entryFee}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5" /> {comp.energyCost}
-                        </span>
-                      </div>
-                      
-                      {isLocked ? (
-                        <Badge variant="secondary">
-                          <Lock className="w-3 h-3 mr-1" />
-                          Pro Only
-                        </Badge>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          disabled={!canEnter}
-                          onClick={() => enterCompetition(comp)}
-                          data-testid={`button-enter-${comp.id}`}
-                        >
-                          Enter
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-          
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              Professional Events
-            </h2>
-            {proComps.map((comp) => {
-              const canEnter = canEnterCompetition(comp);
-              const isLocked = !currentProfile.isProfessional;
-              
-              return (
-                <Card key={comp.id} className={isLocked ? "opacity-60" : ""}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium truncate">{comp.name}</span>
-                          <Badge variant="default" className="text-xs shrink-0">
-                            PRO
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Target className="w-3.5 h-3.5" />
-                            {getOilPatternLabel(comp.oilPattern)}
-                          </span>
-                          <span>{comp.gamesCount} games</span>
-                        </div>
-                        {comp.minAverage && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Min avg: {comp.minAverage}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-chart-3">${comp.prizePool.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Prize Pool</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Coins className="w-3.5 h-3.5" /> ${comp.entryFee}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5" /> {comp.energyCost}
-                        </span>
-                      </div>
-                      
-                      {isLocked ? (
-                        <Badge variant="secondary">
-                          <Lock className="w-3 h-3 mr-1" />
-                          Go Pro First
-                        </Badge>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          disabled={!canEnter}
-                          onClick={() => enterCompetition(comp)}
-                          data-testid={`button-enter-${comp.id}`}
-                        >
-                          Enter
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <CompetitionsHub 
+            onPlayLeagueGame={(league) => {
+              console.log("Play league game:", league);
+            }}
+            onPlayTournamentGame={(tournament) => {
+              console.log("Play tournament game:", tournament);
+            }}
+          />
         </TabsContent>
         
         <TabsContent value="history" className="space-y-4 mt-4">

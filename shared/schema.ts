@@ -188,6 +188,7 @@ export type Property = z.infer<typeof propertySchema>;
 // ============================================
 export const competitionTypeSchema = z.enum(["league", "tournament", "championship"]);
 export const competitionTierSchema = z.enum(["amateur-local", "amateur-regional", "pro-local", "pro-regional", "pro-national"]);
+export type CompetitionTier = z.infer<typeof competitionTierSchema>;
 
 export const competitionSchema = z.object({
   id: z.string(),
@@ -204,6 +205,291 @@ export const competitionSchema = z.object({
 });
 
 export type Competition = z.infer<typeof competitionSchema>;
+
+// ============================================
+// EXPANDED LEAGUE SYSTEM
+// ============================================
+export const leagueTypeSchema = z.enum(["casual", "competitive", "pro"]);
+export type LeagueType = z.infer<typeof leagueTypeSchema>;
+
+export const LEAGUE_DEFINITIONS: Record<LeagueType, { 
+  name: string; 
+  description: string; 
+  entryFee: number; 
+  energyCost: number; 
+  weeklyPrize: number;
+  seasonLength: number;
+  oilPattern: OilPattern;
+  tier: CompetitionTier;
+  minAverage: number;
+  requiresPro: boolean;
+  fieldSize: number;
+}> = {
+  casual: {
+    name: "Casual House League",
+    description: "Relaxed weekly bowling with friendly competition",
+    entryFee: 20,
+    energyCost: 12,
+    weeklyPrize: 100,
+    seasonLength: 10,
+    oilPattern: "house",
+    tier: "amateur-local",
+    minAverage: 0,
+    requiresPro: false,
+    fieldSize: 8,
+  },
+  competitive: {
+    name: "Competitive Sport League",
+    description: "Challenging sport patterns with bigger payouts",
+    entryFee: 50,
+    energyCost: 18,
+    weeklyPrize: 300,
+    seasonLength: 12,
+    oilPattern: "sport",
+    tier: "amateur-regional",
+    minAverage: 160,
+    requiresPro: false,
+    fieldSize: 12,
+  },
+  pro: {
+    name: "Professional League",
+    description: "Elite competition for professional bowlers",
+    entryFee: 200,
+    energyCost: 25,
+    weeklyPrize: 1000,
+    seasonLength: 14,
+    oilPattern: "long",
+    tier: "pro-regional",
+    minAverage: 200,
+    requiresPro: true,
+    fieldSize: 16,
+  },
+};
+
+export const leagueStandingSchema = z.object({
+  bowlerId: z.string(),
+  name: z.string(),
+  isPlayer: z.boolean(),
+  wins: z.number(),
+  losses: z.number(),
+  totalPins: z.number(),
+  gamesPlayed: z.number(),
+  highGame: z.number(),
+  highSeries: z.number(),
+  average: z.number(),
+  points: z.number(),
+});
+
+export type LeagueStanding = z.infer<typeof leagueStandingSchema>;
+
+export const activeLeagueSchema = z.object({
+  id: z.string(),
+  leagueType: leagueTypeSchema,
+  name: z.string(),
+  currentWeek: z.number(),
+  seasonLength: z.number(),
+  standings: z.array(leagueStandingSchema),
+  weeklyResults: z.array(z.object({
+    week: z.number(),
+    playerScores: z.array(z.number()),
+    playerTotal: z.number(),
+    opponentName: z.string(),
+    opponentScores: z.array(z.number()),
+    opponentTotal: z.number(),
+    won: z.boolean(),
+    pointsEarned: z.number(),
+  })),
+  isPlayoffs: z.boolean().default(false),
+  playoffRound: z.number().optional(),
+  isComplete: z.boolean().default(false),
+  startedWeek: z.number(),
+  oilPattern: oilPatternSchema,
+});
+
+export type ActiveLeague = z.infer<typeof activeLeagueSchema>;
+
+// ============================================
+// EXPANDED TOURNAMENT SYSTEM
+// ============================================
+export const tournamentTierSchema = z.enum(["local", "regional", "major"]);
+export type TournamentTier = z.infer<typeof tournamentTierSchema>;
+
+export const tournamentFormatSchema = z.enum(["series", "bracket"]);
+export type TournamentFormat = z.infer<typeof tournamentFormatSchema>;
+
+export const TOURNAMENT_DEFINITIONS: Record<TournamentTier, {
+  name: string;
+  description: string;
+  entryFee: number;
+  energyCost: number;
+  prizePool: number;
+  gamesCount: number;
+  fieldSize: number;
+  oilPattern: OilPattern;
+  minAverage: number;
+  minReputation: number;
+  requiresPro: boolean;
+}> = {
+  local: {
+    name: "Local Open",
+    description: "Entry-level tournament open to all skill levels",
+    entryFee: 50,
+    energyCost: 20,
+    prizePool: 500,
+    gamesCount: 4,
+    fieldSize: 16,
+    oilPattern: "house",
+    minAverage: 0,
+    minReputation: 0,
+    requiresPro: false,
+  },
+  regional: {
+    name: "Regional Championship",
+    description: "Competitive tournament with sport conditions",
+    entryFee: 150,
+    energyCost: 35,
+    prizePool: 2500,
+    gamesCount: 6,
+    fieldSize: 24,
+    oilPattern: "sport",
+    minAverage: 170,
+    minReputation: 15,
+    requiresPro: false,
+  },
+  major: {
+    name: "Major Pro Tournament",
+    description: "Elite competition for professional bowlers",
+    entryFee: 500,
+    energyCost: 50,
+    prizePool: 15000,
+    gamesCount: 8,
+    fieldSize: 32,
+    oilPattern: "long",
+    minAverage: 205,
+    minReputation: 40,
+    requiresPro: true,
+  },
+};
+
+export const tournamentEntrantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isPlayer: z.boolean(),
+  bowlingAverage: z.number(),
+  scores: z.array(z.number()),
+  totalPins: z.number(),
+  eliminated: z.boolean().default(false),
+  placement: z.number().optional(),
+});
+
+export type TournamentEntrant = z.infer<typeof tournamentEntrantSchema>;
+
+export const bracketMatchSchema = z.object({
+  round: z.number(),
+  matchIndex: z.number(),
+  entrant1Id: z.string().nullable(),
+  entrant2Id: z.string().nullable(),
+  entrant1Score: z.number().optional(),
+  entrant2Score: z.number().optional(),
+  winnerId: z.string().nullable(),
+  isComplete: z.boolean(),
+});
+
+export type BracketMatch = z.infer<typeof bracketMatchSchema>;
+
+export const activeTournamentSchema = z.object({
+  id: z.string(),
+  tier: tournamentTierSchema,
+  format: tournamentFormatSchema,
+  name: z.string(),
+  entrants: z.array(tournamentEntrantSchema),
+  currentRound: z.number(),
+  currentGame: z.number(),
+  totalGames: z.number(),
+  bracket: z.array(bracketMatchSchema).optional(),
+  qualifyingCutline: z.number().optional(),
+  isQualifying: z.boolean().default(true),
+  isFinals: z.boolean().default(false),
+  isComplete: z.boolean().default(false),
+  startedWeek: z.number(),
+  oilPattern: oilPatternSchema,
+  prizePool: z.number(),
+  entryFee: z.number(),
+});
+
+export type ActiveTournament = z.infer<typeof activeTournamentSchema>;
+
+// ============================================
+// TOURNAMENT HISTORY
+// ============================================
+export const tournamentResultSchema = z.object({
+  tournamentId: z.string(),
+  tournamentName: z.string(),
+  tier: tournamentTierSchema,
+  format: tournamentFormatSchema,
+  placement: z.number(),
+  totalEntrants: z.number(),
+  totalPins: z.number(),
+  gamesPlayed: z.number(),
+  prizeMoney: z.number(),
+  week: z.number(),
+});
+
+export type TournamentResult = z.infer<typeof tournamentResultSchema>;
+
+// ============================================
+// OIL PATTERN DETAILS
+// ============================================
+export const OIL_PATTERN_DETAILS: Record<OilPattern, {
+  name: string;
+  description: string;
+  difficulty: number;
+  transitionRate: number;
+  hookEffect: number;
+}> = {
+  house: {
+    name: "House Pattern",
+    description: "Forgiving recreational pattern with generous margins",
+    difficulty: 1,
+    transitionRate: 0.8,
+    hookEffect: 1.0,
+  },
+  short: {
+    name: "Short Pattern",
+    description: "Quick-hooking pattern that rewards precision",
+    difficulty: 2,
+    transitionRate: 1.2,
+    hookEffect: 1.3,
+  },
+  sport: {
+    name: "Sport Pattern",
+    description: "Challenging flat pattern requiring accuracy",
+    difficulty: 3,
+    transitionRate: 1.0,
+    hookEffect: 0.9,
+  },
+  long: {
+    name: "Long Pattern",
+    description: "Extended oil pattern demanding power and control",
+    difficulty: 3,
+    transitionRate: 0.7,
+    hookEffect: 0.8,
+  },
+  heavy: {
+    name: "Heavy Oil",
+    description: "Dense oil requiring strong equipment and revs",
+    difficulty: 4,
+    transitionRate: 0.5,
+    hookEffect: 0.6,
+  },
+  dry: {
+    name: "Dry Lanes",
+    description: "Minimal oil with aggressive ball reaction",
+    difficulty: 2,
+    transitionRate: 1.5,
+    hookEffect: 1.5,
+  },
+};
 
 // ============================================
 // SPONSOR
@@ -866,6 +1152,11 @@ export const playerProfileSchema = z.object({
   negotiatedSponsor: negotiatedSponsorSchema.nullable().optional(),
   // Season tracking for sponsor requirements
   tournamentsThisSeason: z.number().optional(),
+  // Expanded competition system
+  activeLeague: activeLeagueSchema.nullable().optional(),
+  activeTournament: activeTournamentSchema.nullable().optional(),
+  tournamentHistory: z.array(tournamentResultSchema).optional(),
+  leagueChampionships: z.number().optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;

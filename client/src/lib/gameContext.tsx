@@ -152,14 +152,18 @@ function migrateBowlingBall(ball: BowlingBall): BowlingBall {
 
 function migratePlayerProfile(profile: PlayerProfile): PlayerProfile {
   const migratedBalls = profile.ownedBalls.map(migrateBowlingBall);
-  const needsUpdate = profile.ownedBalls.some((b, i) => b !== migratedBalls[i]);
+  const ballsNeedUpdate = profile.ownedBalls.some((b, i) => b !== migratedBalls[i]);
   
-  if (!needsUpdate) return profile;
-  
-  return {
+  const migratedProfile: PlayerProfile = {
     ...profile,
     ownedBalls: migratedBalls,
+    activeLeague: profile.activeLeague ?? null,
+    activeTournament: profile.activeTournament ?? null,
+    tournamentHistory: profile.tournamentHistory ?? [],
+    leagueChampionships: profile.leagueChampionships ?? 0,
   };
+  
+  return migratedProfile;
 }
 
 function loadGameState(): GameState {
