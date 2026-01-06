@@ -17,6 +17,7 @@ import { oilPatternDifficulty, GAME_CONSTANTS } from "@shared/schema";
 import { CelebrationOverlay, type CelebrationType } from "@/components/CelebrationOverlay";
 import { applyTraitToStats } from "@/lib/gameUtils";
 import { simulateThrowSimple } from "@/lib/bowlingSimulation";
+import { AlleyEnvironmentPreview } from "@/components/AlleyEnvironmentPreview";
 
 const OIL_PATTERNS: { value: OilPattern; label: string; difficulty: number }[] = [
   { value: "house", label: "House Shot", difficulty: 1 },
@@ -461,6 +462,8 @@ export function BowlScreen() {
             <CardTitle className="text-sm font-medium">Lane Conditions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <AlleyEnvironmentPreview compact />
+            
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Oil Pattern</label>
               <Select value={oilPattern} onValueChange={(v) => setOilPattern(v as OilPattern)}>
