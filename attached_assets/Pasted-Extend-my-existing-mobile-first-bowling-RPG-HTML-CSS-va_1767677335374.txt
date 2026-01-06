@@ -1,0 +1,32 @@
+Extend my existing mobile-first bowling RPG (HTML/CSS/vanilla JS) by adding features 7–10 below WITHOUT breaking current saves/UI. Keep localStorage save slots working and migrate old saves by adding default values for new fields when loading. Do not rebuild from scratch—extend the current codebase.
+
+7) Coaching / Trainer System
+	•	Add a “Coaches” section/tab where the player can hire ONE active coach at a time (simple).
+	•	Coach types: Power, Accuracy, Spare, Mental, Lane Reading, Conditioning.
+	•	Each coach has: weekly cost (money), unlock requirement (rep/avg), and 1–2 passive effects (ex: reduce training energy cost, small stat bonus, spare conversion boost).
+	•	Allow hire/fire with confirmation. Show current coach effects on profile.
+
+8) Injury & Slump System (soft)
+	•	Add minor injuries/slumps that last 1–4 weeks with small temporary penalties (ex: -3 Accuracy, -2 Hook, -5 Consistency).
+	•	Trigger chance increases if player ends a week at very low energy or overtrains.
+	•	Add simple recovery actions: Rest Week, Physical Therapy, Mental Reset (each costs money and/or energy and reduces duration).
+	•	Show “Active Effects” with remaining weeks.
+
+9) Prestige / Legacy
+	•	Add a “Retire” option once player hits a milestone (ex: Season 10 OR winning a major OR high reputation).
+	•	On retirement: store a Hall-of-Fame snapshot (name, seasons, career avg, titles, earnings).
+	•	Award Legacy Points based on career success.
+	•	Starting a new career can spend Legacy Points on small bonuses (choose 3–4 modest options like +5 starting stats, +10 maxEnergy, small starting cash).
+	•	Keep legacy modest so it doesn’t break early game.
+
+10) Weekly Challenges
+	•	Add a “Challenges” screen with 3 weekly challenges that reset every in-game week.
+	•	Track progress + claim rewards (cash, reputation, cosmetic token, or small energy bonus).
+	•	Examples: bowl 3 games over 180, convert 5 spares, complete 2 trainings, win a league night.
+	•	Save progress in localStorage.
+
+Integration requirement
+
+Add a single function applyWeeklyUpdates() (or equivalent) called ONLY when advancing week. It should handle: job pay/energy drain, coach weekly fee, sponsor stipend if exists, injury/slump countdown, challenge reset/updates.
+
+Deliverables: update index.html, style.css, script.js with these features, minimal UI changes, mobile-first.

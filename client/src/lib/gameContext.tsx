@@ -19,9 +19,25 @@ import type {
   PurchaseId,
   PurchaseRecord,
   GameSettings,
-  CareerStats
+  CareerStats,
+  Coach,
+  ActiveEffect,
+  WeeklyChallenge,
+  WeeklyChallengeState,
+  LegacyData,
+  HallOfFameEntry,
+  RecoveryAction
 } from "@shared/schema";
-import { GAME_CONSTANTS, IAP_PRODUCTS, ACHIEVEMENT_INFO } from "@shared/schema";
+import { 
+  GAME_CONSTANTS, 
+  IAP_PRODUCTS, 
+  ACHIEVEMENT_INFO, 
+  AVAILABLE_COACHES, 
+  POSSIBLE_EFFECTS, 
+  RECOVERY_ACTIONS,
+  CHALLENGE_TEMPLATES,
+  LEGACY_BONUSES
+} from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
 
@@ -131,6 +147,27 @@ interface GameContextType {
   checkAndAwardAchievements: () => void;
   hasAchievement: (achievementId: AchievementId) => boolean;
   updateCareerStats: (updates: Partial<CareerStats>) => void;
+  
+  // Coach system
+  hireCoach: (coachId: string) => boolean;
+  fireCoach: () => void;
+  getActiveCoach: () => Coach | null;
+  canHireCoach: (coach: Coach) => boolean;
+  
+  // Injury/Slump system
+  getActiveEffects: () => ActiveEffect[];
+  applyRecoveryAction: (actionId: string, effectId: string) => boolean;
+  
+  // Weekly Challenges
+  getWeeklyChallenges: () => WeeklyChallenge[];
+  updateChallengeProgress: (challengeId: string, amount: number) => void;
+  claimChallengeReward: (challengeId: string) => boolean;
+  
+  // Legacy/Prestige
+  getLegacyData: () => LegacyData;
+  canRetire: () => boolean;
+  retire: () => number;
+  applyLegacyBonus: (bonusId: string) => boolean;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -317,17 +354,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     
     // Reset energy to max at start of week
     let newEnergy = maxEnergy;
+    let newMoney = currentProfile.money;
     
-    // Apply job weekly energy cost and pay
-    let jobPay = 0;
+    // ========================================
+    // applyWeeklyUpdates() - all weekly processing
+    // ========================================
+    
+    // 1. Apply job weekly energy cost and pay
     let newJob = currentProfile.currentJob;
-    
     if (currentProfile.currentJob) {
-      jobPay = currentProfile.currentJob.weeklyPay;
-      // Subtract job energy cost once at week start
+      newMoney += currentProfile.currentJob.weeklyPay;
       newEnergy -= currentProfile.currentJob.energyCost;
       
-      // Handle contract duration
       if (currentProfile.currentJob.weeksRemaining !== undefined) {
         const weeksRemaining = currentProfile.currentJob.weeksRemaining - 1;
         if (weeksRemaining <= 0) {
@@ -338,6 +376,58 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
     
+    // 2. Coach weekly fee
+    const activeCoach = currentProfile.activeCoach;
+    if (activeCoach) {
+      newMoney -= activeCoach.weeklyCost;
+    }
+    
+    // 3. Sponsor stipend
+    let newSponsors = [...currentProfile.activeSponsors];
+    for (const sponsor of currentProfile.activeSponsors) {
+      if (sponsor.active) {
+        newMoney += sponsor.weeklyPay;
+      }
+      if (sponsor.weeksRemaining !== undefined) {
+        const remaining = sponsor.weeksRemaining - 1;
+        if (remaining <= 0) {
+          newSponsors = newSponsors.filter(s => s.id !== sponsor.id);
+        } else {
+          newSponsors = newSponsors.map(s => 
+            s.id === sponsor.id ? { ...s, weeksRemaining: remaining } : s
+          );
+        }
+      }
+    }
+    
+    // 4. Injury/slump countdown
+    let newEffects = [...(currentProfile.activeEffects ?? [])];
+    newEffects = newEffects
+      .map(e => ({ ...e, weeksRemaining: e.weeksRemaining - 1 }))
+      .filter(e => e.weeksRemaining > 0);
+    
+    // 5. Check for new injury/slump if energy was very low at end of week
+    const wasLowEnergy = currentProfile.energy <= 10;
+    if (wasLowEnergy && newEffects.length < 2) {
+      const triggerChance = currentProfile.energy <= 0 ? 0.4 : 0.2;
+      if (Math.random() < triggerChance) {
+        const available = POSSIBLE_EFFECTS.filter(e => 
+          !newEffects.some(existing => existing.name === e.name)
+        );
+        if (available.length > 0) {
+          const selected = available[Math.floor(Math.random() * available.length)];
+          newEffects.push({
+            ...selected,
+            id: Date.now().toString(),
+            weeksRemaining: 1 + Math.floor(Math.random() * 4), // 1-4 weeks
+          });
+        }
+      }
+    }
+    
+    // 6. Weekly challenges reset happens automatically in getWeeklyChallenges
+    // when week/season changes, so no action needed here
+    
     // Clamp energy to minimum 0
     newEnergy = Math.max(0, newEnergy);
     
@@ -345,8 +435,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       currentWeek: newWeek,
       currentSeason: newSeason,
       energy: newEnergy,
-      money: currentProfile.money + jobPay,
+      money: newMoney,
       currentJob: newJob,
+      activeSponsors: newSponsors,
+      activeEffects: newEffects,
     });
   }, [currentProfile, updateProfile]);
 
@@ -630,6 +722,240 @@ export function GameProvider({ children }: { children: ReactNode }) {
     updateProfile({ earnedAchievements: earned });
   }, [currentProfile, updateProfile]);
 
+  // ============================================
+  // COACH SYSTEM
+  // ============================================
+  const getActiveCoach = useCallback((): Coach | null => {
+    return currentProfile?.activeCoach ?? null;
+  }, [currentProfile]);
+
+  const canHireCoach = useCallback((coach: Coach): boolean => {
+    if (!currentProfile) return false;
+    const { reputation, bowlingAverage } = coach.unlockRequirement;
+    if (reputation && currentProfile.stats.reputation < reputation) return false;
+    if (bowlingAverage && currentProfile.bowlingAverage < bowlingAverage) return false;
+    if (currentProfile.money < coach.weeklyCost) return false;
+    return true;
+  }, [currentProfile]);
+
+  const hireCoach = useCallback((coachId: string): boolean => {
+    if (!currentProfile) return false;
+    const coach = AVAILABLE_COACHES.find(c => c.id === coachId);
+    if (!coach || !canHireCoach(coach)) return false;
+    updateProfile({ activeCoach: coach });
+    return true;
+  }, [currentProfile, canHireCoach, updateProfile]);
+
+  const fireCoach = useCallback(() => {
+    updateProfile({ activeCoach: null });
+  }, [updateProfile]);
+
+  // ============================================
+  // INJURY/SLUMP SYSTEM
+  // ============================================
+  const getActiveEffects = useCallback((): ActiveEffect[] => {
+    return currentProfile?.activeEffects ?? [];
+  }, [currentProfile]);
+
+  const applyRecoveryAction = useCallback((actionId: string, effectId: string): boolean => {
+    if (!currentProfile) return false;
+    const action = RECOVERY_ACTIONS.find(a => a.id === actionId);
+    const effects = currentProfile.activeEffects ?? [];
+    const effectIndex = effects.findIndex(e => e.id === effectId);
+    
+    if (!action || effectIndex === -1) return false;
+    const effect = effects[effectIndex];
+    if (!action.applicableTo.includes(effect.type)) return false;
+    if (currentProfile.money < action.moneyCost) return false;
+    if (currentProfile.energy < action.energyCost) return false;
+    
+    const newEffects = [...effects];
+    const newWeeks = effect.weeksRemaining - action.weeksReduction;
+    if (newWeeks <= 0) {
+      newEffects.splice(effectIndex, 1);
+    } else {
+      newEffects[effectIndex] = { ...effect, weeksRemaining: newWeeks };
+    }
+    
+    updateProfile({
+      activeEffects: newEffects,
+      money: currentProfile.money - action.moneyCost,
+      energy: currentProfile.energy - action.energyCost,
+    });
+    return true;
+  }, [currentProfile, updateProfile]);
+
+  // ============================================
+  // WEEKLY CHALLENGES
+  // ============================================
+  const generateWeeklyChallenges = useCallback((): WeeklyChallenge[] => {
+    const shuffled = [...CHALLENGE_TEMPLATES].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3).map(t => ({
+      ...t,
+      progress: 0,
+      claimed: false,
+    }));
+  }, []);
+
+  const getWeeklyChallenges = useCallback((): WeeklyChallenge[] => {
+    if (!currentProfile) return [];
+    const state = currentProfile.weeklyChallenges;
+    if (!state || state.weekGenerated !== currentProfile.currentWeek || state.seasonGenerated !== currentProfile.currentSeason) {
+      // Generate new challenges for this week
+      const newChallenges = generateWeeklyChallenges();
+      const newState: WeeklyChallengeState = {
+        challenges: newChallenges,
+        weekGenerated: currentProfile.currentWeek,
+        seasonGenerated: currentProfile.currentSeason,
+      };
+      updateProfile({ weeklyChallenges: newState });
+      return newChallenges;
+    }
+    return state.challenges;
+  }, [currentProfile, generateWeeklyChallenges, updateProfile]);
+
+  const updateChallengeProgress = useCallback((challengeId: string, amount: number) => {
+    if (!currentProfile) return;
+    const state = currentProfile.weeklyChallenges;
+    if (!state) return;
+    
+    const challenges = state.challenges.map(c => 
+      c.id === challengeId && !c.claimed
+        ? { ...c, progress: Math.min(c.target, c.progress + amount) }
+        : c
+    );
+    updateProfile({ weeklyChallenges: { ...state, challenges } });
+  }, [currentProfile, updateProfile]);
+
+  const claimChallengeReward = useCallback((challengeId: string): boolean => {
+    if (!currentProfile) return false;
+    const state = currentProfile.weeklyChallenges;
+    if (!state) return false;
+    
+    const challenge = state.challenges.find(c => c.id === challengeId);
+    if (!challenge || challenge.claimed || challenge.progress < challenge.target) return false;
+    
+    const challenges = state.challenges.map(c =>
+      c.id === challengeId ? { ...c, claimed: true } : c
+    );
+    
+    let moneyBonus = challenge.reward.cash ?? 0;
+    let energyBonus = challenge.reward.energy ?? 0;
+    let repBonus = challenge.reward.reputation ?? 0;
+    let tokenBonus = challenge.reward.cosmeticToken ?? 0;
+    
+    const newStats = { ...currentProfile.stats };
+    if (repBonus > 0) {
+      newStats.reputation = Math.min(100, newStats.reputation + repBonus);
+    }
+    
+    updateProfile({
+      weeklyChallenges: { ...state, challenges },
+      money: currentProfile.money + moneyBonus,
+      energy: Math.min(currentProfile.maxEnergy ?? GAME_CONSTANTS.MAX_ENERGY, currentProfile.energy + energyBonus),
+      stats: newStats,
+      cosmeticTokens: (currentProfile.cosmeticTokens ?? 0) + tokenBonus,
+    });
+    return true;
+  }, [currentProfile, updateProfile]);
+
+  // ============================================
+  // LEGACY/PRESTIGE SYSTEM
+  // ============================================
+  const getLegacyData = useCallback((): LegacyData => {
+    return gameState.legacyData ?? { legacyPoints: 0, hallOfFame: [], activeBonuses: [] };
+  }, [gameState]);
+
+  const canRetire = useCallback((): boolean => {
+    if (!currentProfile) return false;
+    const careerStats = currentProfile.careerStats ?? { leagueWins: 0, tournamentWins: 0 };
+    // Can retire if: Season 10+ OR won a major (tournament/league) OR high reputation (80+)
+    return currentProfile.currentSeason >= 10 ||
+           careerStats.leagueWins >= 1 ||
+           careerStats.tournamentWins >= 1 ||
+           currentProfile.stats.reputation >= 80;
+  }, [currentProfile]);
+
+  const retire = useCallback((): number => {
+    if (!currentProfile || !canRetire()) return 0;
+    
+    const careerStats = currentProfile.careerStats ?? {
+      highGame: 0,
+      totalStrikes: 0,
+      totalSpares: 0,
+      totalTurkeys: 0,
+      totalDoubles: 0,
+      perfectGames: 0,
+      leagueWins: 0,
+      tournamentWins: 0,
+      totalEarnings: 0,
+      rivalWins: 0,
+      longestStrikeStreak: 0,
+    };
+    
+    // Calculate legacy points
+    let points = 0;
+    points += currentProfile.currentSeason * 2; // 2 per season
+    points += careerStats.leagueWins * 5; // 5 per league win
+    points += careerStats.tournamentWins * 10; // 10 per tournament win
+    points += careerStats.perfectGames * 15; // 15 per perfect game
+    points += Math.floor(careerStats.totalEarnings / 10000); // 1 per $10k earned
+    points += currentProfile.isProfessional ? 20 : 0; // Bonus for going pro
+    
+    const hofEntry: HallOfFameEntry = {
+      id: Date.now().toString(),
+      name: `${currentProfile.firstName} ${currentProfile.lastName}`,
+      seasons: currentProfile.currentSeason,
+      careerAverage: currentProfile.bowlingAverage,
+      totalTitles: careerStats.leagueWins + careerStats.tournamentWins,
+      totalEarnings: careerStats.totalEarnings,
+      perfectGames: careerStats.perfectGames,
+      retiredAt: new Date().toISOString(),
+    };
+    
+    const legacy = getLegacyData();
+    setGameState(prev => ({
+      ...prev,
+      legacyData: {
+        legacyPoints: legacy.legacyPoints + points,
+        hallOfFame: [...legacy.hallOfFame, hofEntry],
+        activeBonuses: legacy.activeBonuses,
+      },
+    }));
+    
+    // Delete the current save slot
+    if (currentSlot !== null) {
+      setGameState(prev => ({
+        ...prev,
+        currentSlot: null,
+        saves: prev.saves.map(s =>
+          s.slotId === currentSlot
+            ? { slotId: s.slotId, isEmpty: true, profile: null, lastSaved: null }
+            : s
+        ),
+      }));
+    }
+    
+    return points;
+  }, [currentProfile, currentSlot, canRetire, getLegacyData, setGameState]);
+
+  const applyLegacyBonus = useCallback((bonusId: string): boolean => {
+    const legacy = getLegacyData();
+    const bonus = LEGACY_BONUSES.find(b => b.id === bonusId);
+    if (!bonus || legacy.legacyPoints < bonus.cost) return false;
+    if (legacy.activeBonuses.includes(bonusId)) return false;
+    
+    setGameState(prev => ({
+      ...prev,
+      legacyData: {
+        ...legacy,
+        legacyPoints: legacy.legacyPoints - bonus.cost,
+        activeBonuses: [...legacy.activeBonuses, bonusId],
+      },
+    }));
+    return true;
+  }, [getLegacyData, setGameState]);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -663,6 +989,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
       checkAndAwardAchievements,
       hasAchievement,
       updateCareerStats,
+      // Coach system
+      hireCoach,
+      fireCoach,
+      getActiveCoach,
+      canHireCoach,
+      // Injury/Slump system
+      getActiveEffects,
+      applyRecoveryAction,
+      // Weekly Challenges
+      getWeeklyChallenges,
+      updateChallengeProgress,
+      claimChallengeReward,
+      // Legacy/Prestige
+      getLegacyData,
+      canRetire,
+      retire,
+      applyLegacyBonus,
     }}>
       {children}
     </GameContext.Provider>

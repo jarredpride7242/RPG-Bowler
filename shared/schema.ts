@@ -376,6 +376,170 @@ export const IAP_PRODUCTS = {
 };
 
 // ============================================
+// COACH SYSTEM
+// ============================================
+export const coachTypeSchema = z.enum(["power", "accuracy", "spare", "mental", "lane-reading", "conditioning"]);
+export type CoachType = z.infer<typeof coachTypeSchema>;
+
+export const coachSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: coachTypeSchema,
+  weeklyCost: z.number(),
+  unlockRequirement: z.object({
+    reputation: z.number().optional(),
+    bowlingAverage: z.number().optional(),
+  }),
+  effects: z.object({
+    statBonus: z.record(z.string(), z.number()).optional(),
+    trainingEnergyCostReduction: z.number().optional(),
+    spareConversionBoost: z.number().optional(),
+    strikeBoost: z.number().optional(),
+    mentalBoost: z.number().optional(),
+  }),
+});
+
+export type Coach = z.infer<typeof coachSchema>;
+
+export const AVAILABLE_COACHES: Coach[] = [
+  { id: "power-coach", name: "Mike 'Thunder' Johnson", type: "power", weeklyCost: 150, unlockRequirement: { reputation: 10 }, effects: { statBonus: { throwPower: 3, revRate: 2 }, strikeBoost: 5 } },
+  { id: "accuracy-coach", name: "Sarah Chen", type: "accuracy", weeklyCost: 175, unlockRequirement: { bowlingAverage: 140 }, effects: { statBonus: { accuracy: 3, consistency: 2 }, trainingEnergyCostReduction: 5 } },
+  { id: "spare-coach", name: "Bob 'Clean Sheet' Miller", type: "spare", weeklyCost: 125, unlockRequirement: { reputation: 15 }, effects: { statBonus: { spareShooting: 4 }, spareConversionBoost: 10 } },
+  { id: "mental-coach", name: "Dr. Emily Park", type: "mental", weeklyCost: 200, unlockRequirement: { bowlingAverage: 160 }, effects: { statBonus: { mentalToughness: 4 }, mentalBoost: 8 } },
+  { id: "lane-coach", name: "Pete Reynolds", type: "lane-reading", weeklyCost: 150, unlockRequirement: { reputation: 20 }, effects: { statBonus: { laneReading: 4, equipmentKnowledge: 2 } } },
+  { id: "conditioning-coach", name: "Coach Martinez", type: "conditioning", weeklyCost: 100, unlockRequirement: { reputation: 5 }, effects: { statBonus: { stamina: 3 }, trainingEnergyCostReduction: 8 } },
+];
+
+// ============================================
+// INJURY / SLUMP SYSTEM
+// ============================================
+export const effectTypeSchema = z.enum(["injury", "slump"]);
+export type EffectType = z.infer<typeof effectTypeSchema>;
+
+export const activeEffectSchema = z.object({
+  id: z.string(),
+  type: effectTypeSchema,
+  name: z.string(),
+  description: z.string(),
+  weeksRemaining: z.number(),
+  statPenalties: z.record(z.string(), z.number()),
+});
+
+export type ActiveEffect = z.infer<typeof activeEffectSchema>;
+
+export const POSSIBLE_EFFECTS: Omit<ActiveEffect, "id" | "weeksRemaining">[] = [
+  { type: "injury", name: "Sore Wrist", description: "Minor wrist strain from overuse", statPenalties: { accuracy: -3, hookControl: -2 } },
+  { type: "injury", name: "Back Strain", description: "Lower back tightness affecting form", statPenalties: { throwPower: -3, consistency: -2 } },
+  { type: "injury", name: "Finger Irritation", description: "Blistering on bowling fingers", statPenalties: { revRate: -3, control: -2 } },
+  { type: "slump", name: "Mental Block", description: "Struggling with confidence", statPenalties: { mentalToughness: -4, consistency: -3 } },
+  { type: "slump", name: "Timing Issues", description: "Approach timing feels off", statPenalties: { accuracy: -3, speedControl: -2 } },
+  { type: "slump", name: "Lane Reading Struggles", description: "Difficulty reading oil patterns", statPenalties: { laneReading: -4, equipmentKnowledge: -2 } },
+];
+
+export const recoveryActionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  moneyCost: z.number(),
+  energyCost: z.number(),
+  weeksReduction: z.number(),
+  applicableTo: z.array(effectTypeSchema),
+});
+
+export type RecoveryAction = z.infer<typeof recoveryActionSchema>;
+
+export const RECOVERY_ACTIONS: RecoveryAction[] = [
+  { id: "rest-week", name: "Rest Week", description: "Take it easy and recover naturally", moneyCost: 0, energyCost: 30, weeksReduction: 1, applicableTo: ["injury", "slump"] },
+  { id: "physical-therapy", name: "Physical Therapy", description: "Professional treatment for injuries", moneyCost: 300, energyCost: 10, weeksReduction: 2, applicableTo: ["injury"] },
+  { id: "mental-reset", name: "Mental Reset", description: "Work with a sports psychologist", moneyCost: 250, energyCost: 15, weeksReduction: 2, applicableTo: ["slump"] },
+];
+
+// ============================================
+// PRESTIGE / LEGACY SYSTEM
+// ============================================
+export const hallOfFameEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  seasons: z.number(),
+  careerAverage: z.number(),
+  totalTitles: z.number(),
+  totalEarnings: z.number(),
+  perfectGames: z.number(),
+  retiredAt: z.string(),
+});
+
+export type HallOfFameEntry = z.infer<typeof hallOfFameEntrySchema>;
+
+export const legacyBonusSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  cost: z.number(),
+  effect: z.object({
+    startingStatBonus: z.number().optional(),
+    maxEnergyBonus: z.number().optional(),
+    startingCash: z.number().optional(),
+    reputationBonus: z.number().optional(),
+  }),
+});
+
+export type LegacyBonus = z.infer<typeof legacyBonusSchema>;
+
+export const LEGACY_BONUSES: LegacyBonus[] = [
+  { id: "stat-boost-5", name: "Natural Talent", description: "+5 to all starting stats", cost: 10, effect: { startingStatBonus: 5 } },
+  { id: "energy-boost-10", name: "Peak Fitness", description: "+10 max weekly energy", cost: 8, effect: { maxEnergyBonus: 10 } },
+  { id: "starting-cash", name: "Family Savings", description: "+$2,000 starting cash", cost: 5, effect: { startingCash: 2000 } },
+  { id: "reputation-boost", name: "Famous Lineage", description: "+10 starting reputation", cost: 7, effect: { reputationBonus: 10 } },
+];
+
+export const legacyDataSchema = z.object({
+  legacyPoints: z.number().default(0),
+  hallOfFame: z.array(hallOfFameEntrySchema).default([]),
+  activeBonuses: z.array(z.string()).default([]),
+});
+
+export type LegacyData = z.infer<typeof legacyDataSchema>;
+
+// ============================================
+// WEEKLY CHALLENGES
+// ============================================
+export const weeklyChallengeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  target: z.number(),
+  progress: z.number().default(0),
+  reward: z.object({
+    cash: z.number().optional(),
+    reputation: z.number().optional(),
+    energy: z.number().optional(),
+    cosmeticToken: z.number().optional(),
+  }),
+  claimed: z.boolean().default(false),
+});
+
+export type WeeklyChallenge = z.infer<typeof weeklyChallengeSchema>;
+
+export const CHALLENGE_TEMPLATES = [
+  { id: "games-180", name: "High Scorer", description: "Bowl 3 games over 180", target: 3, reward: { cash: 500 } },
+  { id: "spares-5", name: "Spare Master", description: "Convert 5 spares", target: 5, reward: { reputation: 3 } },
+  { id: "trainings-2", name: "Dedicated Athlete", description: "Complete 2 training sessions", target: 2, reward: { energy: 15 } },
+  { id: "strikes-10", name: "Strike Force", description: "Bowl 10 strikes", target: 10, reward: { cash: 300 } },
+  { id: "league-win", name: "League Victory", description: "Win a league night", target: 1, reward: { reputation: 5, cash: 200 } },
+  { id: "tournament-top3", name: "Podium Finish", description: "Finish top 3 in a tournament", target: 1, reward: { cash: 750 } },
+  { id: "games-4", name: "Active Bowler", description: "Bowl 4 games this week", target: 4, reward: { cash: 200, reputation: 2 } },
+  { id: "perfect-frame", name: "Strike Streak", description: "Get 3 strikes in a row", target: 1, reward: { cosmeticToken: 1 } },
+];
+
+export const weeklyChallengeStateSchema = z.object({
+  challenges: z.array(weeklyChallengeSchema),
+  weekGenerated: z.number(),
+  seasonGenerated: z.number(),
+});
+
+export type WeeklyChallengeState = z.infer<typeof weeklyChallengeStateSchema>;
+
+// ============================================
 // GAME SETTINGS
 // ============================================
 export const gameSettingsSchema = z.object({
@@ -480,6 +644,14 @@ export const playerProfileSchema = z.object({
   purchases: z.array(purchaseRecordSchema).optional(),
   settings: gameSettingsSchema.optional(),
   careerStats: careerStatsSchema.optional(),
+  // Coach system
+  activeCoach: coachSchema.nullable().optional(),
+  // Injury/Slump system
+  activeEffects: z.array(activeEffectSchema).optional(),
+  // Weekly challenges
+  weeklyChallenges: weeklyChallengeStateSchema.optional(),
+  // Cosmetic tokens (earned from challenges)
+  cosmeticTokens: z.number().optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
@@ -502,6 +674,7 @@ export type SaveSlot = z.infer<typeof saveSlotSchema>;
 export const gameStateSchema = z.object({
   currentSlot: z.number().nullable(),
   saves: z.array(saveSlotSchema),
+  legacyData: legacyDataSchema.optional(),
 });
 
 export type GameState = z.infer<typeof gameStateSchema>;

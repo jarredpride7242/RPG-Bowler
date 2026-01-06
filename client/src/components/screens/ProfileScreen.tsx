@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,12 +31,19 @@ import {
   Heart,
   Sparkles,
   Star,
-  Save
+  Save,
+  GraduationCap,
+  AlertTriangle,
+  Crown
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useTheme } from "@/lib/themeContext";
 import { GAME_CONSTANTS, ACHIEVEMENT_INFO, type AchievementId } from "@shared/schema";
 import { Trophy, Award, Lock } from "lucide-react";
+import { CoachesTab } from "@/components/CoachesTab";
+import { InjurySlumpPanel } from "@/components/InjurySlumpPanel";
+import { WeeklyChallengesPanel } from "@/components/WeeklyChallengesPanel";
+import { LegacyPanel } from "@/components/LegacyPanel";
 
 const STAT_ICONS: Record<string, typeof Target> = {
   throwPower: Zap,
@@ -70,10 +78,11 @@ const STAT_LABELS: Record<string, string> = {
 };
 
 export function ProfileScreen() {
-  const { currentProfile, saveCurrentGame, exitToMenu } = useGame();
+  const { currentProfile, saveCurrentGame, exitToMenu, getActiveEffects, getActiveCoach } = useGame();
   const { theme, toggleTheme } = useTheme();
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   
   if (!currentProfile) return null;
   
@@ -106,6 +115,9 @@ export function ProfileScreen() {
       </div>
     );
   };
+
+  const activeEffects = getActiveEffects();
+  const activeCoach = getActiveCoach();
 
   return (
     <div className="space-y-4 pb-24 px-4 pt-4">
@@ -149,140 +161,195 @@ export function ProfileScreen() {
               <p className="text-xs text-muted-foreground">Season</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Player Stats
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {Object.entries(currentProfile.stats).map(([key, value]) => 
-            renderStatRow(key, value)
+          
+          {(activeEffects.length > 0 || activeCoach) && (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+              {activeCoach && (
+                <Badge variant="secondary" className="text-xs">
+                  <GraduationCap className="w-3 h-3 mr-1" />
+                  Coach: {activeCoach.name.split(" ")[0]}
+                </Badge>
+              )}
+              {activeEffects.map(effect => (
+                <Badge key={effect.id} variant="destructive" className="text-xs">
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {effect.name}
+                </Badge>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Trophy className="w-4 h-4" />
-            Achievements ({
-              (() => {
-                const earnedFromNew = currentProfile.earnedAchievements?.filter(a => a.earnedAt).map(a => a.id) || [];
-                const earnedFromLegacy = currentProfile.achievements || [];
-                const allEarned = new Set([...earnedFromNew, ...earnedFromLegacy]);
-                return allEarned.size;
-              })()
-            }/{Object.keys(ACHIEVEMENT_INFO).length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="grid gap-2">
-            {Object.entries(ACHIEVEMENT_INFO).map(([id, info]) => {
-              const earnedData = currentProfile.earnedAchievements?.find(a => a.id === id);
-              const earned = earnedData?.earnedAt !== undefined || currentProfile.achievements?.includes(id);
-              
-              return (
-                <div 
-                  key={id}
-                  className={`flex items-center gap-3 p-2 rounded-md ${earned ? "bg-primary/10 border border-primary/20" : "bg-muted/50"}`}
-                  data-testid={`achievement-${id}`}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${earned ? "bg-primary text-primary-foreground" : "bg-muted-foreground/20 text-muted-foreground"}`}>
-                    {earned ? <Award className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${earned ? "" : "text-muted-foreground"}`}>
-                      {info.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {info.description}
-                    </p>
-                    {earnedData?.progress !== undefined && earnedData?.target !== undefined && !earned && (
-                      <Progress value={(earnedData.progress / earnedData.target) * 100} className="h-1 mt-1" />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Settings
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {theme === "dark" ? (
-                <Moon className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <Sun className="w-4 h-4 text-muted-foreground" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview" className="text-xs px-1" data-testid="tab-overview">
+            <User className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="challenges" className="text-xs px-1" data-testid="tab-challenges">
+            <Target className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="coach" className="text-xs px-1" data-testid="tab-coach">
+            <GraduationCap className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="health" className="text-xs px-1" data-testid="tab-health">
+            <Heart className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="legacy" className="text-xs px-1" data-testid="tab-legacy">
+            <Crown className="w-4 h-4" />
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Player Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Object.entries(currentProfile.stats).map(([key, value]) => 
+                renderStatRow(key, value)
               )}
-              <Label htmlFor="dark-mode">Dark Mode</Label>
-            </div>
-            <Switch 
-              id="dark-mode" 
-              checked={theme === "dark"}
-              onCheckedChange={toggleTheme}
-              data-testid="switch-dark-mode"
-            />
-          </div>
-          
-          <div className="flex flex-col gap-2 pt-2 border-t border-border">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={handleSave}
-              data-testid="button-save-game"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Game
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="w-full justify-start text-destructive"
-              onClick={() => setShowExitDialog(true)}
-              data-testid="button-exit-menu"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Exit to Main Menu
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
       
-      {currentProfile.relationships.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Heart className="w-4 h-4" />
-              Relationships
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {currentProfile.relationships.map((rel) => (
-              <div key={rel.id} className="flex items-center justify-between">
-                <span className="text-sm">{rel.name}</span>
-                <div className="flex items-center gap-2">
-                  <Progress value={rel.level} className="w-20 h-1.5" />
-                  <span className="text-xs text-muted-foreground w-8">{rel.level}%</span>
-                </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Trophy className="w-4 h-4" />
+                Achievements ({
+                  (() => {
+                    const earnedFromNew = currentProfile.earnedAchievements?.filter(a => a.earnedAt).map(a => a.id) || [];
+                    const earnedFromLegacy = currentProfile.achievements || [];
+                    const allEarned = new Set([...earnedFromNew, ...earnedFromLegacy]);
+                    return allEarned.size;
+                  })()
+                }/{Object.keys(ACHIEVEMENT_INFO).length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid gap-2">
+                {Object.entries(ACHIEVEMENT_INFO).map(([id, info]) => {
+                  const earnedData = currentProfile.earnedAchievements?.find(a => a.id === id);
+                  const earned = earnedData?.earnedAt !== undefined || currentProfile.achievements?.includes(id);
+                  
+                  return (
+                    <div 
+                      key={id}
+                      className={`flex items-center gap-3 p-2 rounded-md ${earned ? "bg-primary/10 border border-primary/20" : "bg-muted/50"}`}
+                      data-testid={`achievement-${id}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${earned ? "bg-primary text-primary-foreground" : "bg-muted-foreground/20 text-muted-foreground"}`}>
+                        {earned ? <Award className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${earned ? "" : "text-muted-foreground"}`}>
+                          {info.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {info.description}
+                        </p>
+                        {earnedData?.progress !== undefined && earnedData?.target !== undefined && !earned && (
+                          <Progress value={(earnedData.progress / earnedData.target) * 100} className="h-1 mt-1" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+      
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {theme === "dark" ? (
+                    <Moon className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Sun className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <Label htmlFor="dark-mode">Dark Mode</Label>
+                </div>
+                <Switch 
+                  id="dark-mode" 
+                  checked={theme === "dark"}
+                  onCheckedChange={toggleTheme}
+                  data-testid="switch-dark-mode"
+                />
+              </div>
+          
+              <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={handleSave}
+                  data-testid="button-save-game"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Game
+                </Button>
+            
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-destructive"
+                  onClick={() => setShowExitDialog(true)}
+                  data-testid="button-exit-menu"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Exit to Main Menu
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+      
+          {currentProfile.relationships.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Heart className="w-4 h-4" />
+                  Relationships
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {currentProfile.relationships.map((rel) => (
+                  <div key={rel.id} className="flex items-center justify-between">
+                    <span className="text-sm">{rel.name}</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={rel.level} className="w-20 h-1.5" />
+                      <span className="text-xs text-muted-foreground w-8">{rel.level}%</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="challenges" className="mt-4">
+          <WeeklyChallengesPanel />
+        </TabsContent>
+        
+        <TabsContent value="coach" className="mt-4">
+          <CoachesTab />
+        </TabsContent>
+        
+        <TabsContent value="health" className="mt-4">
+          <InjurySlumpPanel />
+        </TabsContent>
+        
+        <TabsContent value="legacy" className="mt-4">
+          <LegacyPanel />
+        </TabsContent>
+      </Tabs>
       
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <AlertDialogContent>
