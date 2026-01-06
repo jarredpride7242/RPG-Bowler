@@ -1,0 +1,62 @@
+Expand my existing bowling RPG’s Bowling Ball Shop by adding many more generated bowling balls and improving how they look in the UI. Do not break existing saves or inventory. Keep everything mobile-first and saved via localStorage.
+
+1) Add more bowling balls (bigger catalog + variety)
+	•	Increase the number of shop balls available at a time (ex: 30–60) and regenerate stock on a schedule (ex: weekly refresh) while also keeping a few “featured” balls that persist longer.
+	•	Add clear ball categories/filters:
+	•	Plastic
+	•	Urethane
+	•	Reactive Solid
+	•	Reactive Pearl
+	•	Reactive Hybrid
+	•	Add rarity tiers with weighted probabilities:
+	•	Common, Rare, Epic, Legendary
+	•	Add price scaling by tier and ball strength.
+	•	Ensure ball generation produces varied attribute profiles, not duplicates.
+	•	Add “Sort by” options:
+	•	Price (low/high)
+	•	Hook Potential (high/low)
+	•	Control (high/low)
+	•	Oil Handling (high/low)
+	•	Best for current oil pattern (recommended sort)
+
+2) Improve ball details (realistic attributes + readability)
+
+Each ball should display these attributes (some already exist; add missing ones):
+	•	Coverstock type (plastic/urethane/reactive solid/pearl/hybrid)
+	•	Core type (symmetric/asymmetric)
+	•	Hook Potential
+	•	Control
+	•	Backend Reaction
+	•	Oil Handling
+	•	Forgiveness
+	•	Recommended lane condition (dry/medium/heavy)
+	•	Optional: RG and Differential as simple numbers (fictional but plausible ranges)
+
+Add a “Ball Details” modal when a ball is tapped:
+	•	Shows full stats, rarity, price, and a short flavor description
+	•	Shows “Buy” button + confirmation prompt
+	•	Shows “Compare” button to compare with the currently equipped ball (side-by-side)
+
+3) Update the look of bowling balls (visual upgrade)
+
+Improve the shop/inventory UI so each ball has a more appealing visual:
+	•	Render each ball as a stylized circular ball icon with:
+	•	a unique color/pattern (swirl, split-color, stripes, speckled)
+	•	small “finger holes” detail
+	•	a small badge for rarity (C/R/E/L)
+	•	Use CSS (gradients + pseudo-elements) or canvas (lightweight) but no external libraries.
+	•	The ball’s visual design should be generated based on its seed/name so it stays consistent (same ball = same look).
+	•	Make sure it’s mobile performant and doesn’t cover too much screen space.
+
+4) Naming + uniqueness improvements
+	•	Expand the procedural naming system to produce more unique, brand-like (but fictional) names:
+	•	Pattern: [Adjective] + [Concept/Animal] + [Suffix], e.g., “Neon Viper X”, “Midnight Comet Pro”, “Iron Serpent HX”
+	•	Add a small “Series” label and a short flavor tagline (fictional).
+	•	Ensure no real bowling brand names are used.
+
+5) Save compatibility + inventory
+	•	Keep existing owned balls and equipped ball intact.
+	•	If new fields are added to ball objects (visual seed, rg/diff, etc.), add defaults for older saved balls on load.
+	•	Save shop stock refresh state (week/refresh timer) so it behaves consistently.
+
+Deliverables: Update index.html, style.css, and script.js with the expanded ball generation system, filters/sorting, ball detail modal with compare, and upgraded ball visuals.

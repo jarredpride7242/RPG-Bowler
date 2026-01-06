@@ -65,6 +65,11 @@ export type Handedness = z.infer<typeof handednessSchema>;
 // ============================================
 export const ballTypeSchema = z.enum(["plastic", "urethane", "reactive-solid", "reactive-pearl", "reactive-hybrid"]);
 export const coreTypeSchema = z.enum(["symmetric", "asymmetric"]);
+export const ballRaritySchema = z.enum(["common", "rare", "epic", "legendary"]);
+export const laneConditionSchema = z.enum(["dry", "medium", "heavy"]);
+
+export type BallRarity = z.infer<typeof ballRaritySchema>;
+export type LaneCondition = z.infer<typeof laneConditionSchema>;
 
 export const bowlingBallSchema = z.object({
   id: z.string(),
@@ -80,9 +85,40 @@ export const bowlingBallSchema = z.object({
   owned: z.boolean().optional(),
   surfaceAdjustment: z.number().optional(),
   drillingUpgrade: z.boolean().optional(),
+  rarity: ballRaritySchema.optional(),
+  visualSeed: z.number().optional(),
+  rg: z.number().min(2.4).max(2.8).optional(),
+  differential: z.number().min(0.01).max(0.06).optional(),
+  recommendedCondition: laneConditionSchema.optional(),
+  series: z.string().optional(),
+  tagline: z.string().optional(),
 });
 
 export type BowlingBall = z.infer<typeof bowlingBallSchema>;
+
+// Ball rarity weights for generation
+export const BALL_RARITY_WEIGHTS: Record<BallRarity, number> = {
+  common: 50,
+  rare: 30,
+  epic: 15,
+  legendary: 5,
+};
+
+// Price multipliers by rarity
+export const BALL_RARITY_PRICE_MULTIPLIER: Record<BallRarity, number> = {
+  common: 1,
+  rare: 1.5,
+  epic: 2.5,
+  legendary: 4,
+};
+
+// Stat bonus ranges by rarity
+export const BALL_RARITY_STAT_BONUS: Record<BallRarity, { min: number; max: number }> = {
+  common: { min: 0, max: 1 },
+  rare: { min: 1, max: 2 },
+  epic: { min: 2, max: 3 },
+  legendary: { min: 3, max: 4 },
+};
 
 // ============================================
 // OIL PATTERNS

@@ -118,11 +118,67 @@ function createEmptySaveSlots(): SaveSlot[] {
   }));
 }
 
+function migrateBowlingBall(ball: BowlingBall): BowlingBall {
+  const needsMigration = ball.rarity === undefined || ball.visualSeed === undefined;
+  if (!needsMigration) return ball;
+  
+  const idHash = ball.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const totalStats = ball.hookPotential + ball.backendReaction + ball.oilHandling;
+  
+  let rarity: "common" | "rare" | "epic" | "legendary" = "common";
+  if (totalStats >= 24 || ball.price >= 350) rarity = "legendary";
+  else if (totalStats >= 20 || ball.price >= 250) rarity = "epic";
+  else if (totalStats >= 15 || ball.price >= 150) rarity = "rare";
+  
+  const conditionMap: Record<string, "dry" | "medium" | "heavy"> = {
+    plastic: "dry",
+    urethane: "medium",
+    "reactive-solid": "heavy",
+    "reactive-pearl": "medium",
+    "reactive-hybrid": "heavy",
+  };
+  
+  return {
+    ...ball,
+    rarity: ball.rarity ?? rarity,
+    visualSeed: ball.visualSeed ?? idHash,
+    rg: ball.rg ?? Number((2.4 + (idHash % 40) / 100).toFixed(3)),
+    differential: ball.differential ?? Number((0.01 + (idHash % 50) / 1000).toFixed(3)),
+    recommendedCondition: ball.recommendedCondition ?? conditionMap[ball.type] ?? "medium",
+    series: ball.series ?? "Classic Collection",
+    tagline: ball.tagline ?? "A reliable performer for any skill level.",
+  };
+}
+
+function migratePlayerProfile(profile: PlayerProfile): PlayerProfile {
+  const migratedBalls = profile.ownedBalls.map(migrateBowlingBall);
+  const needsUpdate = profile.ownedBalls.some((b, i) => b !== migratedBalls[i]);
+  
+  if (!needsUpdate) return profile;
+  
+  return {
+    ...profile,
+    ownedBalls: migratedBalls,
+  };
+}
+
 function loadGameState(): GameState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const state: GameState = JSON.parse(stored);
+      
+      state.saves = state.saves.map(slot => {
+        if (slot.profile) {
+          return {
+            ...slot,
+            profile: migratePlayerProfile(slot.profile),
+          };
+        }
+        return slot;
+      });
+      
+      return state;
     }
   } catch (e) {
     console.error("Failed to load game state:", e);

@@ -1,9 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,95 +34,32 @@ import {
   Sparkles,
   Battery,
   DollarSign,
-  RefreshCw
+  RefreshCw,
+  Filter,
+  ArrowUpDown,
+  Star
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import type { BowlingBall, Job, Property, Relationship, PurchaseId } from "@shared/schema";
+import type { BowlingBall, Job, Property, Relationship, PurchaseId, BallRarity } from "@shared/schema";
 import { IAP_PRODUCTS, GAME_CONSTANTS } from "@shared/schema";
+import { BallVisual } from "@/components/BallVisual";
+import { BallDetailModal } from "@/components/BallDetailModal";
+import { 
+  generateShopInventory, 
+  getFeaturedBalls, 
+  getWeekSeed,
+  sortBalls,
+  filterBallsByType,
+  filterBallsByRarity,
+  type SortOption
+} from "@/lib/ballGenerator";
 
-const BALL_PREFIXES = ["Thunder", "Storm", "Cyclone", "Vortex", "Blaze", "Shadow", "Phantom", "Titan", "Apex", "Quantum"];
-const BALL_SUFFIXES = ["Strike", "Fury", "Force", "Rush", "Wave", "Core", "Pro", "Elite", "Master", "X"];
-
-function generateBallName(): string {
-  const prefix = BALL_PREFIXES[Math.floor(Math.random() * BALL_PREFIXES.length)];
-  const suffix = BALL_SUFFIXES[Math.floor(Math.random() * BALL_SUFFIXES.length)];
-  return `${prefix} ${suffix}`;
-}
-
-const SHOP_BALLS: BowlingBall[] = [
-  {
-    id: "plastic-basic",
-    name: "Spare Master",
-    type: "plastic",
-    coreType: "symmetric",
-    hookPotential: 1,
-    control: 9,
-    backendReaction: 1,
-    oilHandling: 2,
-    forgiveness: 9,
-    price: 80,
-  },
-  {
-    id: "urethane-entry",
-    name: generateBallName(),
-    type: "urethane",
-    coreType: "symmetric",
-    hookPotential: 4,
-    control: 7,
-    backendReaction: 4,
-    oilHandling: 5,
-    forgiveness: 7,
-    price: 150,
-  },
-  {
-    id: "reactive-solid-1",
-    name: generateBallName(),
-    type: "reactive-solid",
-    coreType: "symmetric",
-    hookPotential: 6,
-    control: 6,
-    backendReaction: 6,
-    oilHandling: 7,
-    forgiveness: 5,
-    price: 220,
-  },
-  {
-    id: "reactive-pearl-1",
-    name: generateBallName(),
-    type: "reactive-pearl",
-    coreType: "symmetric",
-    hookPotential: 7,
-    control: 5,
-    backendReaction: 8,
-    oilHandling: 5,
-    forgiveness: 4,
-    price: 250,
-  },
-  {
-    id: "reactive-hybrid-1",
-    name: generateBallName(),
-    type: "reactive-hybrid",
-    coreType: "asymmetric",
-    hookPotential: 8,
-    control: 5,
-    backendReaction: 7,
-    oilHandling: 6,
-    forgiveness: 4,
-    price: 300,
-  },
-  {
-    id: "pro-asym",
-    name: generateBallName(),
-    type: "reactive-solid",
-    coreType: "asymmetric",
-    hookPotential: 9,
-    control: 4,
-    backendReaction: 9,
-    oilHandling: 8,
-    forgiveness: 3,
-    price: 400,
-  },
-];
+const RARITY_COLORS: Record<BallRarity, string> = {
+  common: "bg-zinc-600 text-zinc-100",
+  rare: "bg-blue-600 text-blue-100",
+  epic: "bg-purple-600 text-purple-100",
+  legendary: "bg-amber-500 text-amber-100",
+};
 
 const AVAILABLE_JOBS: Job[] = [
   {
@@ -214,13 +159,30 @@ export function ShopScreen() {
     getMaxEnergy
   } = useGame();
   const [selectedBall, setSelectedBall] = useState<BowlingBall | null>(null);
+  const [detailBall, setDetailBall] = useState<BowlingBall | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseId | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [rarityFilter, setRarityFilter] = useState<string>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("price-low");
   
   if (!currentProfile) return null;
   
   const ownedBallIds = currentProfile.ownedBalls.map(b => b.id);
+  
+  const weekSeed = getWeekSeed(currentProfile.currentWeek);
+  
+  const shopBalls = useMemo(() => {
+    const allBalls = generateShopInventory(weekSeed, 45);
+    let filtered = filterBallsByType(allBalls, typeFilter);
+    filtered = filterBallsByRarity(filtered, rarityFilter);
+    return sortBalls(filtered, sortOption);
+  }, [weekSeed, typeFilter, rarityFilter, sortOption]);
+  
+  const featuredBalls = useMemo(() => getFeaturedBalls(weekSeed), [weekSeed]);
+  
+  const activeBall = currentProfile.ownedBalls.find(b => b.id === currentProfile.activeBallId) || null;
   
   const handleBuyBall = () => {
     if (!selectedBall) return;
@@ -328,19 +290,18 @@ export function ShopScreen() {
           {currentProfile.ownedBalls.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Your Balls</CardTitle>
+                <CardTitle className="text-sm font-medium">Your Balls ({currentProfile.ownedBalls.length})</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {currentProfile.ownedBalls.map((ball) => (
                   <div 
                     key={ball.id}
-                    className={`
-                      flex items-center justify-between p-3 rounded-md border
-                      ${ball.id === currentProfile.activeBallId ? "border-primary bg-primary/5" : "border-border"}
-                    `}
+                    className={`flex items-center justify-between p-3 rounded-md border hover-elevate cursor-pointer ${ball.id === currentProfile.activeBallId ? "border-primary bg-primary/5" : "border-border"}`}
+                    onClick={() => setDetailBall(ball)}
+                    data-testid={`owned-ball-${ball.id}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full ${getBallTypeColor(ball.type)}`} />
+                      <BallVisual ball={ball} size="sm" showRarity={!!ball.rarity} />
                       <div>
                         <p className="font-medium text-sm">{ball.name}</p>
                         <p className="text-xs text-muted-foreground capitalize">
@@ -354,7 +315,7 @@ export function ShopScreen() {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => setActiveBall(ball.id)}
+                        onClick={(e) => { e.stopPropagation(); setActiveBall(ball.id); }}
                         data-testid={`button-equip-${ball.id}`}
                       >
                         Equip
@@ -366,61 +327,160 @@ export function ShopScreen() {
             </Card>
           )}
           
-          <h2 className="text-sm font-medium text-muted-foreground">Pro Shop</h2>
-          {SHOP_BALLS.map((ball) => {
-            const isOwned = ownedBallIds.includes(ball.id);
-            const canAfford = currentProfile.money >= ball.price;
-            
-            return (
-              <Card key={ball.id} className={isOwned ? "opacity-60" : ""}>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-12 h-12 rounded-full shrink-0 ${getBallTypeColor(ball.type)}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-medium truncate">{ball.name}</span>
-                        {isOwned ? (
-                          <Badge variant="secondary">
-                            <Check className="w-3 h-3 mr-1" />
-                            Owned
+          {featuredBalls.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-medium">Featured Balls</h2>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap pb-2">
+                <div className="flex gap-3">
+                  {featuredBalls.map((ball) => {
+                    const isOwned = ownedBallIds.includes(ball.id);
+                    return (
+                      <Card 
+                        key={ball.id} 
+                        className={`w-36 shrink-0 hover-elevate cursor-pointer ${isOwned ? "opacity-60" : ""}`}
+                        onClick={() => setDetailBall(ball)}
+                        data-testid={`featured-ball-${ball.id}`}
+                      >
+                        <CardContent className="p-3 flex flex-col items-center">
+                          <BallVisual ball={ball} size="lg" />
+                          <p className="font-medium text-xs mt-2 text-center truncate w-full">{ball.name}</p>
+                          <Badge className={`mt-1 ${RARITY_COLORS[ball.rarity || "common"]}`} variant="secondary">
+                            {(ball.rarity || "common").charAt(0).toUpperCase() + (ball.rarity || "common").slice(1)}
                           </Badge>
-                        ) : (
-                          <span className="font-semibold text-primary">${ball.price}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-xs capitalize">
+                          <p className="text-sm font-semibold text-primary mt-1">${ball.price}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Pro Shop ({shopBalls.length})</h2>
+              <span className="text-xs text-muted-foreground">Refreshes weekly</span>
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-type-filter">
+                  <Filter className="w-3 h-3 mr-1" />
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="plastic">Plastic</SelectItem>
+                  <SelectItem value="urethane">Urethane</SelectItem>
+                  <SelectItem value="reactive-solid">Reactive Solid</SelectItem>
+                  <SelectItem value="reactive-pearl">Reactive Pearl</SelectItem>
+                  <SelectItem value="reactive-hybrid">Reactive Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={rarityFilter} onValueChange={setRarityFilter}>
+                <SelectTrigger className="w-28 h-8 text-xs" data-testid="select-rarity-filter">
+                  <SelectValue placeholder="Rarity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Rarities</SelectItem>
+                  <SelectItem value="common">Common</SelectItem>
+                  <SelectItem value="rare">Rare</SelectItem>
+                  <SelectItem value="epic">Epic</SelectItem>
+                  <SelectItem value="legendary">Legendary</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-sort">
+                  <ArrowUpDown className="w-3 h-3 mr-1" />
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="price-low">Price: Low</SelectItem>
+                  <SelectItem value="price-high">Price: High</SelectItem>
+                  <SelectItem value="hook-high">Hook: High</SelectItem>
+                  <SelectItem value="hook-low">Hook: Low</SelectItem>
+                  <SelectItem value="control-high">Control: High</SelectItem>
+                  <SelectItem value="oil-high">Oil: High</SelectItem>
+                  <SelectItem value="recommended">Recommended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {shopBalls.map((ball) => {
+              const isOwned = ownedBallIds.includes(ball.id);
+              const canAfford = currentProfile.money >= ball.price;
+              
+              return (
+                <Card 
+                  key={ball.id} 
+                  className={`hover-elevate cursor-pointer ${isOwned ? "opacity-60" : ""}`}
+                  onClick={() => setDetailBall(ball)}
+                  data-testid={`shop-ball-${ball.id}`}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-2">
+                      <BallVisual ball={ball} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs truncate">{ball.name}</p>
+                        <Badge className={`text-[10px] ${RARITY_COLORS[ball.rarity || "common"]}`} variant="secondary">
+                          {(ball.rarity || "common").charAt(0).toUpperCase() + (ball.rarity || "common").slice(1)}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground capitalize mt-0.5">
                           {ball.type.replace("-", " ")}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {ball.coreType}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1">
-                        {renderStatBar("Hook", ball.hookPotential)}
-                        {renderStatBar("Control", ball.control)}
-                        {renderStatBar("Backend", ball.backendReaction)}
-                        {renderStatBar("Oil", ball.oilHandling)}
-                        {renderStatBar("Forgive", ball.forgiveness)}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                  
-                  {!isOwned && (
-                    <Button 
-                      className="w-full mt-3"
-                      disabled={!canAfford}
-                      onClick={() => setSelectedBall(ball)}
-                      data-testid={`button-buy-${ball.id}`}
-                    >
-                      <ShoppingBag className="w-4 h-4 mr-2" />
-                      Purchase
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                    
+                    <div className="mt-2 space-y-0.5">
+                      {renderStatBar("Hook", ball.hookPotential)}
+                      {renderStatBar("Oil", ball.oilHandling)}
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+                      {isOwned ? (
+                        <Badge variant="secondary" className="text-xs">
+                          <Check className="w-3 h-3 mr-1" />
+                          Owned
+                        </Badge>
+                      ) : (
+                        <>
+                          <span className={`font-semibold text-sm ${canAfford ? "text-primary" : "text-muted-foreground"}`}>
+                            ${ball.price}
+                          </span>
+                          <Button 
+                            size="sm"
+                            disabled={!canAfford}
+                            onClick={(e) => { e.stopPropagation(); setSelectedBall(ball); }}
+                            data-testid={`button-buy-${ball.id}`}
+                          >
+                            Buy
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          
+          {shopBalls.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No balls match your filters.</p>
+              <Button variant="ghost" onClick={() => { setTypeFilter("all"); setRarityFilter("all"); }}>
+                Clear Filters
+              </Button>
+            </div>
+          )}
         </TabsContent>
         
         <TabsContent value="jobs" className="space-y-4 mt-4">
@@ -832,6 +892,20 @@ export function ShopScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <BallDetailModal
+        ball={detailBall}
+        compareBall={activeBall}
+        onClose={() => setDetailBall(null)}
+        onBuy={() => {
+          if (detailBall) {
+            setSelectedBall(detailBall);
+            setDetailBall(null);
+          }
+        }}
+        isOwned={detailBall ? ownedBallIds.includes(detailBall.id) : false}
+        canAfford={detailBall ? currentProfile.money >= detailBall.price : false}
+      />
     </div>
   );
 }
