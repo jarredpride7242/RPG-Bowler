@@ -15,6 +15,7 @@ import type { OilPattern, FrameResult, GameResult, Opponent, Competition } from 
 import { oilPatternDifficulty } from "@shared/schema";
 import { simulateOpponentGameFrameByFrame, applyTraitToStats } from "@/lib/gameUtils";
 import { CelebrationOverlay, type CelebrationType } from "@/components/CelebrationOverlay";
+import { simulateThrowSimple } from "@/lib/bowlingSimulation";
 
 interface PlayMatchProps {
   competition: Competition;
@@ -24,6 +25,8 @@ interface PlayMatchProps {
   onForfeit: () => void;
 }
 
+// Use advanced bowling simulation from bowlingSimulation.ts
+// This provides realistic pin leave distributions including splits, corner pins, etc.
 function simulateThrow(
   pinsRemaining: number,
   stats: { accuracy: number; hookControl: number; consistency: number; revRate: number; mentalToughness: number; laneReading: number; spareShooting: number },
@@ -33,52 +36,15 @@ function simulateThrow(
   isSpareAttempt: boolean,
   energy: number
 ): number {
-  const energyPenalty = energy < 30 ? 0.85 : energy < 50 ? 0.93 : 1;
-  const lateFrameBonus = frameNumber >= 9 ? (stats.mentalToughness / 100) * 0.1 : 0;
-  const oilPenalty = 1 - (oilDifficulty * 0.08) + (stats.laneReading / 100) * 0.05;
-  
-  let baseChance: number;
-  if (!isSpareAttempt && pinsRemaining === 10) {
-    baseChance = (
-      (stats.accuracy * 0.25) +
-      (stats.hookControl * 0.2) +
-      (stats.consistency * 0.2) +
-      (stats.revRate * 0.15) +
-      (ballStats.hookPotential * 3) +
-      (ballStats.control * 2) +
-      (ballStats.oilHandling * 1.5)
-    ) / 100;
-  } else {
-    baseChance = (
-      (stats.spareShooting * 0.35) +
-      (stats.accuracy * 0.25) +
-      (stats.consistency * 0.2) +
-      (ballStats.control * 3) +
-      (ballStats.forgiveness * 2)
-    ) / 100;
-  }
-  
-  const finalChance = baseChance * energyPenalty * oilPenalty * (1 + lateFrameBonus);
-  const roll = Math.random();
-  
-  if (!isSpareAttempt && pinsRemaining === 10) {
-    if (roll < finalChance * 0.3) {
-      return 10;
-    }
-    const avgPins = 6 + (finalChance * 3);
-    const variance = (1 - stats.consistency / 100) * 4;
-    const pins = Math.round(avgPins + (Math.random() - 0.5) * variance);
-    return Math.max(0, Math.min(10, pins));
-  }
-  
-  if (roll < finalChance * 0.5) {
-    return pinsRemaining;
-  }
-  
-  const avgPins = pinsRemaining * (0.4 + finalChance * 0.5);
-  const variance = (1 - stats.consistency / 100) * pinsRemaining * 0.3;
-  const pins = Math.round(avgPins + (Math.random() - 0.5) * variance);
-  return Math.max(0, Math.min(pinsRemaining, pins));
+  return simulateThrowSimple(
+    pinsRemaining,
+    stats,
+    ballStats,
+    oilDifficulty,
+    frameNumber,
+    isSpareAttempt,
+    energy
+  );
 }
 
 function calculateFrameScore(frames: FrameResult[], frameIndex: number): number {

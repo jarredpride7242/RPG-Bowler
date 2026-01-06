@@ -1,5 +1,6 @@
 import type { BowlingBall, OilPattern, PlayerStats, Sponsor, Opponent, Competition, BowlingStyle, Handedness, BowlingTrait } from "@shared/schema";
 import { oilPatternDifficulty, GAME_CONSTANTS } from "@shared/schema";
+import { simulateThrowAdvanced, type ThrowParams, BOWLING_TUNING } from "./bowlingSimulation";
 
 type CompetitionTier = Competition['tier'];
 
@@ -143,6 +144,7 @@ export function calculateSpareProbability(
 
 /**
  * Simulate a single throw and return pins knocked down
+ * Uses advanced bowling simulation with realistic pin leave distributions
  */
 export function simulateThrow(
   pinsRemaining: number,
@@ -153,35 +155,23 @@ export function simulateThrow(
   frameNumber: number,
   energy: number
 ): number {
-  const roll = Math.random();
+  // Build pins standing array for the simulation
+  const pinsStanding = isSpareAttempt 
+    ? Array.from({ length: pinsRemaining }, (_, i) => i + 1)
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   
-  if (!isSpareAttempt && pinsRemaining === 10) {
-    // First throw - chance for strike
-    const strikeProb = calculateStrikeProbability(stats, ball, oilPattern, frameNumber, energy);
-    
-    if (roll < strikeProb) {
-      return 10; // Strike!
-    }
-    
-    // Not a strike - calculate pins based on stats
-    const avgPins = 5 + (stats.accuracy / 100) * 3 + (stats.consistency / 100) * 2;
-    const variance = (1 - stats.consistency / 100) * 4;
-    const pins = Math.round(avgPins + (Math.random() - 0.5) * variance);
-    return Math.max(0, Math.min(9, pins));
-  }
+  const params: ThrowParams = {
+    pinsStanding,
+    stats,
+    ball,
+    oilPattern,
+    frameNumber,
+    energy,
+    isSpareAttempt,
+  };
   
-  // Spare attempt
-  const spareProb = calculateSpareProbability(stats, ball, pinsRemaining, energy);
-  
-  if (roll < spareProb) {
-    return pinsRemaining; // Spare!
-  }
-  
-  // Missed spare - calculate pins
-  const avgPins = pinsRemaining * (0.4 + (stats.spareShooting / 100) * 0.4);
-  const variance = (1 - stats.consistency / 100) * pinsRemaining * 0.3;
-  const pins = Math.round(avgPins + (Math.random() - 0.5) * variance);
-  return Math.max(0, Math.min(pinsRemaining - 1, pins));
+  const result = simulateThrowAdvanced(params);
+  return result.pinsKnocked;
 }
 
 // ============================================
