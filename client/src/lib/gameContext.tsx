@@ -402,6 +402,11 @@ interface GameContextType {
   breakUp: (profileId: string) => void;
   getCurrentPartner: () => ActiveDatingProfile | null;
   getRelationshipPerks: () => { mentalToughness: number; energyRecovery: number };
+  
+  // Bowling Alley Ownership
+  purchaseBowlingAlley: (name: string) => boolean;
+  upgradeBowlingAlley: () => boolean;
+  canPurchaseBowlingAlley: () => boolean;
 }
 
 const GameContext = createContext<GameContextType | null>(null);

@@ -1723,6 +1723,28 @@ export const activeEventSchema = z.object({
 export type ActiveEvent = z.infer<typeof activeEventSchema>;
 
 // ============================================
+// OWNED BOWLING ALLEY
+// ============================================
+export const BOWLING_ALLEY_CONSTANTS = {
+  PURCHASE_COST: 1000000,
+  BASE_WEEKLY_PROFIT: 5000,
+  MAX_UPGRADE_LEVEL: 5,
+  UPGRADE_COSTS: [0, 100000, 250000, 500000, 750000, 1000000],
+  PROFIT_MULTIPLIERS: [1, 1.5, 2, 2.5, 3, 4],
+};
+
+export const ownedBowlingAlleySchema = z.object({
+  name: z.string(),
+  purchaseWeek: z.number(),
+  purchaseSeason: z.number(),
+  upgradeLevel: z.number().min(0).max(5),
+  totalProfitEarned: z.number(),
+  weeklyProfit: z.number(),
+});
+
+export type OwnedBowlingAlley = z.infer<typeof ownedBowlingAlleySchema>;
+
+// ============================================
 // GAME HISTORY
 // ============================================
 export const gameResultSchema = z.object({
@@ -1808,6 +1830,8 @@ export const playerProfileSchema = z.object({
   lastEventWeek: z.number().optional(),
   // Enhanced dating system
   datingState: datingSystemStateSchema.optional(),
+  // Owned bowling alley (pro-only, $1M purchase)
+  ownedBowlingAlley: ownedBowlingAlleySchema.nullable().optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
