@@ -44,6 +44,42 @@ Preferred communication style: Simple, everyday language.
 - **Progression**: Training costs energy, competitions earn money and reputation, pro status requires threshold achievements
 - **Economy**: Money earned through jobs, competitions, sponsorships; spent on equipment and entry fees
 
+### New Feature Systems
+
+#### Cosmetics System
+- **5 Categories**: Ball skins, celebration animations, lane effects, avatar accessories, profile themes
+- **20+ Items**: Multiple rarity tiers (common, rare, epic, legendary)
+- **Unlock Methods**: Achievement rewards, reputation milestones, money purchases, sponsor rewards, legacy bonuses
+- **Equip System**: One item per category, purely visual (no gameplay advantages)
+
+#### Expanded Career Statistics
+- **23 Fields**: Includes high game, high series, current/best strike streak, frame distribution counts
+- **Calculated Percentages**: Strike%, spare%, open frame% derived from frame counts
+- **Tournament Records**: Best finishes, podium counts, major championship wins
+- **Rival Tracking**: Win/loss record against rivals, rivalry events history
+
+#### Sponsor Negotiation System
+- **4 Tiers**: Local, regional, national, elite sponsors
+- **Safe vs Negotiated Offers**: Risk/reward choices during negotiation
+- **Requirements**: Weekly tournament counts, minimum placements, reputation thresholds
+- **Penalty System**: Contract termination warnings/actions integrated into weekly updates
+- **Pro-Only**: Sponsorship tab unlocked after achieving professional status
+
+#### Expanded Hall of Fame
+- **14 Additional Fields**: Peak stats, achievements earned, cosmetics collected, legacy points
+- **Career Summary Cards**: Detailed statistics display for retired bowlers
+- **Legacy Points**: Calculated from career accomplishments, unlock prestige bonuses
+
+### Profile Screen Tabs (8 total)
+1. Overview - Player stats and settings
+2. Achievements - Detailed achievement tracking with filters and career records
+3. Cosmetics - Equipment and unlock management
+4. Sponsors - Negotiation panel (pro-only)
+5. Challenges - Weekly challenge system
+6. Coach - Training and coaching features
+7. Health - Injury and slump management
+8. Legacy - Prestige system and Hall of Fame
+
 ## External Dependencies
 
 ### UI/Component Libraries
