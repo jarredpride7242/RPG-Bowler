@@ -202,6 +202,7 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
       </div>
       
       <PlayMatch
+        key={`game-${currentGameIndex}`}
         competition={competition}
         opponents={[opponent]}
         gameIndex={currentGameIndex}

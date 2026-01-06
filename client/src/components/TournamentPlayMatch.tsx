@@ -246,6 +246,7 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
       </div>
       
       <PlayMatch
+        key={`game-${currentGame}-round-${tournament.currentRound}`}
         competition={competition}
         opponents={[currentOpponent]}
         gameIndex={currentGame}
