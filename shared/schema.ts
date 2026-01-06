@@ -382,6 +382,7 @@ export const gameSettingsSchema = z.object({
   celebrationsEnabled: z.boolean().default(true),
   soundEnabled: z.boolean().default(true),
   darkMode: z.boolean().default(true),
+  enableAnimations: z.boolean().default(true),
 });
 
 export type GameSettings = z.infer<typeof gameSettingsSchema>;

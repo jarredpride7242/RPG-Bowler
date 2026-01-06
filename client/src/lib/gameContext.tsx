@@ -125,6 +125,7 @@ interface GameContextType {
   hasPurchased: (purchaseId: PurchaseId) => boolean;
   restorePurchases: () => void;
   updateSettings: (settings: Partial<GameSettings>) => void;
+  getSettings: () => GameSettings;
   getMaxEnergy: () => number;
   updateRivalry: (opponentId: string, opponentName: string, won: boolean) => void;
   checkAndAwardAchievements: () => void;
@@ -187,6 +188,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         celebrationsEnabled: true,
         soundEnabled: true,
         darkMode: true,
+        enableAnimations: true,
       },
       careerStats: {
         highGame: 0,
@@ -488,13 +490,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback((settings: Partial<GameSettings>) => {
     if (!currentProfile) return;
-    const currentSettings = currentProfile.settings ?? {
+    const currentSettings: GameSettings = currentProfile.settings ?? {
       celebrationsEnabled: true,
       soundEnabled: true,
       darkMode: true,
+      enableAnimations: true,
     };
     updateProfile({ settings: { ...currentSettings, ...settings } });
   }, [currentProfile, updateProfile]);
+
+  const getSettings = useCallback((): GameSettings => {
+    const defaultSettings: GameSettings = {
+      celebrationsEnabled: true,
+      soundEnabled: true,
+      darkMode: true,
+      enableAnimations: true,
+    };
+    if (!currentProfile?.settings) return defaultSettings;
+    return { ...defaultSettings, ...currentProfile.settings };
+  }, [currentProfile]);
 
   const updateRivalry = useCallback((opponentId: string, opponentName: string, won: boolean) => {
     if (!currentProfile) return;
@@ -643,6 +657,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       hasPurchased,
       restorePurchases,
       updateSettings,
+      getSettings,
       getMaxEnergy,
       updateRivalry,
       checkAndAwardAchievements,
