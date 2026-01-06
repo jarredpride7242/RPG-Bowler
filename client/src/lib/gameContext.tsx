@@ -32,7 +32,16 @@ import type {
   EquippedCosmetics,
   NegotiatedSponsor,
   SponsorOffer,
-  SponsorTier
+  SponsorTier,
+  TriggeredEvent,
+  ActiveEventEffect,
+  EventChoice,
+  WeeklyEventTemplate,
+  DatingSystemState,
+  DatingMatch,
+  ActiveDatingProfile,
+  ChatMessage,
+  DatingStatus
 } from "@shared/schema";
 import { 
   GAME_CONSTANTS, 
@@ -44,7 +53,12 @@ import {
   CHALLENGE_TEMPLATES,
   LEGACY_BONUSES,
   AVAILABLE_COSMETICS,
-  SPONSOR_TEMPLATES
+  SPONSOR_TEMPLATES,
+  WEEKLY_EVENT_TEMPLATES,
+  DATING_FIRST_NAMES,
+  DATING_INTERESTS,
+  DATING_COMPATIBILITY_TAGS,
+  DATING_CHAT_TEMPLATES
 } from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
@@ -166,6 +180,98 @@ function migratePlayerProfile(profile: PlayerProfile): PlayerProfile {
   return migratedProfile;
 }
 
+function generateWeeklyEvent(
+  profile: PlayerProfile
+): TriggeredEvent | null {
+  if (Math.random() > GAME_CONSTANTS.EVENT_RATE) {
+    return null;
+  }
+  
+  const isMajor = Math.random() < GAME_CONSTANTS.MAJOR_EVENT_RATE;
+  const hasPartner = profile.datingState?.currentPartnerId !== null;
+  
+  const eligibleEvents = WEEKLY_EVENT_TEMPLATES.filter(e => {
+    if (e.isMajor !== isMajor) return false;
+    if (e.requiresPro && !profile.isProfessional) return false;
+    if (e.requiresRelationship && !hasPartner) return false;
+    return true;
+  });
+  
+  if (eligibleEvents.length === 0) return null;
+  
+  const totalWeight = eligibleEvents.reduce((sum, e) => sum + e.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  let selected: WeeklyEventTemplate | null = null;
+  for (const event of eligibleEvents) {
+    random -= event.weight;
+    if (random <= 0) {
+      selected = event;
+      break;
+    }
+  }
+  
+  if (!selected) selected = eligibleEvents[0];
+  
+  return {
+    eventId: selected.id,
+    title: selected.title,
+    description: selected.description,
+    category: selected.category,
+    choices: selected.choices,
+    weekTriggered: profile.currentWeek,
+    resolved: false,
+  };
+}
+
+function generateDatingMatch(charisma: number): DatingMatch {
+  const firstName = DATING_FIRST_NAMES[Math.floor(Math.random() * DATING_FIRST_NAMES.length)];
+  const personality = ["outgoing", "reserved", "adventurous", "homebody", "ambitious", "laid-back"][
+    Math.floor(Math.random() * 6)
+  ] as DatingMatch["personality"];
+  
+  const numInterests = 2 + Math.floor(Math.random() * 3);
+  const shuffledInterests = [...DATING_INTERESTS].sort(() => Math.random() - 0.5);
+  const interests = shuffledInterests.slice(0, numInterests);
+  
+  const numTags = 2 + Math.floor(Math.random() * 2);
+  const shuffledTags = [...DATING_COMPATIBILITY_TAGS].sort(() => Math.random() - 0.5);
+  const tags = shuffledTags.slice(0, numTags);
+  
+  const baseScore = 30 + Math.floor(Math.random() * 30);
+  const charismaBonus = Math.floor((charisma - 30) * 0.5);
+  const matchScore = Math.min(100, Math.max(10, baseScore + charismaBonus + Math.floor(Math.random() * 20)));
+  
+  const bios = [
+    `Love ${interests[0]} and ${interests[1] || "good vibes"}. Looking for someone fun!`,
+    `${personality === "adventurous" ? "Always down for an adventure" : "Chill and easy-going"}. Let's chat!`,
+    `${interests[0]} enthusiast. Swipe right if you like ${interests[1] || "meeting new people"}!`,
+    `Looking for someone to share ${interests[0]} with. Bonus if you can bowl!`,
+  ];
+  
+  return {
+    id: `match-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: firstName,
+    age: 22 + Math.floor(Math.random() * 12),
+    bio: bios[Math.floor(Math.random() * bios.length)],
+    compatibilityTags: tags,
+    avatarSeed: Math.floor(Math.random() * 10000),
+    personality,
+    interests,
+    matchScore,
+  };
+}
+
+function getDefaultDatingState(): DatingSystemState {
+  return {
+    availableMatches: [],
+    activeProfiles: [],
+    currentPartnerId: null,
+    relationshipHistory: [],
+    lastMatchRefreshWeek: 0,
+  };
+}
+
 function loadGameState(): GameState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -278,6 +384,23 @@ interface GameContextType {
   acceptSponsorOffer: (offer: SponsorOffer, negotiated: boolean) => boolean;
   cancelSponsorContract: () => void;
   incrementTournamentCount: () => void;
+  
+  // Weekly Random Events system
+  getPendingEvent: () => TriggeredEvent | null;
+  resolveEvent: (choiceId: string) => void;
+  getActiveEventEffects: () => ActiveEventEffect[];
+  dismissEvent: () => void;
+  
+  // Enhanced Dating system
+  getDatingState: () => DatingSystemState;
+  refreshMatches: () => void;
+  swipeMatch: (matchId: string, liked: boolean) => void;
+  sendChatMessage: (profileId: string, choiceId: string) => void;
+  goOnDate: (profileId: string) => { success: boolean; outcome: string; relationshipChange: number };
+  makeExclusive: (profileId: string) => boolean;
+  breakUp: (profileId: string) => void;
+  getCurrentPartner: () => ActiveDatingProfile | null;
+  getRelationshipPerks: () => { mentalToughness: number; energyRecovery: number };
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -598,6 +721,37 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
     
+    // 9. Weekly Random Events - countdown existing effects and potentially trigger new event
+    let newActiveEventEffects = [...(currentProfile.activeEventEffects ?? [])];
+    newActiveEventEffects = newActiveEventEffects
+      .map(e => ({ ...e, weeksRemaining: e.weeksRemaining - 1 }))
+      .filter(e => e.weeksRemaining > 0);
+    
+    // Generate new event if no pending event exists
+    let newPendingEvent = currentProfile.pendingEvent;
+    if (!newPendingEvent || newPendingEvent.resolved) {
+      const tempProfile = { ...currentProfile, currentWeek: newWeek };
+      newPendingEvent = generateWeeklyEvent(tempProfile);
+    }
+    
+    // 10. Dating system - relationship decay if not interacting
+    let newDatingState = currentProfile.datingState;
+    if (newDatingState) {
+      const updatedProfiles = newDatingState.activeProfiles.map(p => {
+        const weeksSinceInteraction = newWeek - p.lastInteractionWeek;
+        if (weeksSinceInteraction > 2 && p.status !== "broken-up") {
+          // Slight decay for neglected relationships
+          const decay = Math.min(5, weeksSinceInteraction - 2);
+          return {
+            ...p,
+            relationshipLevel: Math.max(0, p.relationshipLevel - decay),
+          };
+        }
+        return p;
+      });
+      newDatingState = { ...newDatingState, activeProfiles: updatedProfiles };
+    }
+    
     // Clamp energy to minimum 0
     newEnergy = Math.max(0, newEnergy);
     
@@ -612,6 +766,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       negotiatedSponsor: newNegotiatedSponsor,
       stats: newStats,
       tournamentsThisSeason: newTournamentsThisSeason,
+      activeEventEffects: newActiveEventEffects,
+      pendingEvent: newPendingEvent,
+      datingState: newDatingState,
     });
   }, [currentProfile, updateProfile]);
 
@@ -1335,6 +1492,387 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [currentProfile, updateProfile]);
 
+  // Weekly Random Events system
+  const getPendingEvent = useCallback((): TriggeredEvent | null => {
+    return currentProfile?.pendingEvent ?? null;
+  }, [currentProfile]);
+
+  const resolveEvent = useCallback((choiceId: string) => {
+    if (!currentProfile || !currentProfile.pendingEvent) return;
+    
+    const event = currentProfile.pendingEvent;
+    const choice = event.choices.find(c => c.id === choiceId);
+    if (!choice) return;
+    
+    let newMoney = currentProfile.money;
+    let newEnergy = currentProfile.energy;
+    let newStats = { ...currentProfile.stats };
+    let newActiveEventEffects = [...(currentProfile.activeEventEffects ?? [])];
+    
+    // Apply costs
+    if (choice.cost?.money) newMoney -= choice.cost.money;
+    if (choice.cost?.energy) newEnergy -= choice.cost.energy;
+    
+    // Apply outcomes
+    if (choice.outcome.money) newMoney += choice.outcome.money;
+    if (choice.outcome.energy) newEnergy += choice.outcome.energy;
+    if (choice.outcome.reputation) {
+      newStats.reputation = Math.min(100, Math.max(0, newStats.reputation + choice.outcome.reputation));
+    }
+    
+    // Add stat buffs/debuffs
+    if (choice.outcome.statBonus) {
+      const { stat, amount, weeks } = choice.outcome.statBonus;
+      newActiveEventEffects.push({
+        id: `buff-${Date.now()}`,
+        name: `${event.title} Bonus`,
+        description: `+${amount} ${stat}`,
+        effectType: "buff",
+        stat,
+        amount,
+        weeksRemaining: weeks,
+        sourceEventId: event.eventId,
+      });
+    }
+    
+    if (choice.outcome.statPenalty) {
+      const { stat, amount, weeks } = choice.outcome.statPenalty;
+      newActiveEventEffects.push({
+        id: `debuff-${Date.now()}`,
+        name: `${event.title} Penalty`,
+        description: `-${amount} ${stat}`,
+        effectType: "debuff",
+        stat,
+        amount: -amount,
+        weeksRemaining: weeks,
+        sourceEventId: event.eventId,
+      });
+    }
+    
+    // Handle relationship changes in dating
+    if (choice.outcome.relationshipChange && currentProfile.datingState?.currentPartnerId) {
+      const newDatingState = { ...currentProfile.datingState };
+      newDatingState.activeProfiles = newDatingState.activeProfiles.map(p => {
+        if (p.matchId === newDatingState.currentPartnerId) {
+          return {
+            ...p,
+            relationshipLevel: Math.min(100, Math.max(0, p.relationshipLevel + (choice.outcome.relationshipChange || 0))),
+          };
+        }
+        return p;
+      });
+      updateProfile({ datingState: newDatingState });
+    }
+    
+    // Record resolved event
+    const resolvedEvent = { ...event, resolved: true, choiceMade: choiceId };
+    const newHistory = [...(currentProfile.weeklyEventHistory ?? []), resolvedEvent];
+    
+    updateProfile({
+      money: Math.max(0, newMoney),
+      energy: Math.max(0, newEnergy),
+      stats: newStats,
+      activeEventEffects: newActiveEventEffects,
+      pendingEvent: null,
+      weeklyEventHistory: newHistory,
+    });
+  }, [currentProfile, updateProfile]);
+
+  const getActiveEventEffects = useCallback((): ActiveEventEffect[] => {
+    return currentProfile?.activeEventEffects ?? [];
+  }, [currentProfile]);
+
+  const dismissEvent = useCallback(() => {
+    if (!currentProfile) return;
+    updateProfile({ pendingEvent: null });
+  }, [currentProfile, updateProfile]);
+
+  // Enhanced Dating system
+  const getDatingState = useCallback((): DatingSystemState => {
+    return currentProfile?.datingState ?? getDefaultDatingState();
+  }, [currentProfile]);
+
+  const refreshMatches = useCallback(() => {
+    if (!currentProfile) return;
+    
+    const charisma = currentProfile.stats.charisma;
+    const numMatches = 3 + Math.floor(charisma / 30);
+    const newMatches: DatingMatch[] = [];
+    
+    for (let i = 0; i < numMatches; i++) {
+      newMatches.push(generateDatingMatch(charisma));
+    }
+    
+    const currentDating = currentProfile.datingState ?? getDefaultDatingState();
+    updateProfile({
+      datingState: {
+        ...currentDating,
+        availableMatches: newMatches,
+        lastMatchRefreshWeek: currentProfile.currentWeek,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const swipeMatch = useCallback((matchId: string, liked: boolean) => {
+    if (!currentProfile) return;
+    
+    const datingState = currentProfile.datingState ?? getDefaultDatingState();
+    const match = datingState.availableMatches.find(m => m.id === matchId);
+    
+    if (!match) return;
+    
+    // Remove from available matches
+    const newAvailable = datingState.availableMatches.filter(m => m.id !== matchId);
+    
+    if (liked) {
+      // Create active profile for matched person
+      const newProfile: ActiveDatingProfile = {
+        matchId: match.id,
+        match,
+        status: "talking",
+        relationshipLevel: match.matchScore > 70 ? 15 : 10,
+        chatHistory: [],
+        currentChatStep: "intro",
+        datesTaken: 0,
+        lastInteractionWeek: currentProfile.currentWeek,
+        isCurrentPartner: false,
+        weekStarted: currentProfile.currentWeek,
+      };
+      
+      updateProfile({
+        datingState: {
+          ...datingState,
+          availableMatches: newAvailable,
+          activeProfiles: [...datingState.activeProfiles, newProfile],
+        },
+      });
+    } else {
+      updateProfile({
+        datingState: {
+          ...datingState,
+          availableMatches: newAvailable,
+        },
+      });
+    }
+  }, [currentProfile, updateProfile]);
+
+  const sendChatMessage = useCallback((profileId: string, choiceId: string) => {
+    if (!currentProfile) return;
+    
+    const datingState = currentProfile.datingState ?? getDefaultDatingState();
+    const profileIndex = datingState.activeProfiles.findIndex(p => p.matchId === profileId);
+    if (profileIndex === -1) return;
+    
+    const profile = datingState.activeProfiles[profileIndex];
+    const currentStep = DATING_CHAT_TEMPLATES.find(s => s.id === profile.currentChatStep);
+    if (!currentStep) return;
+    
+    const choice = currentStep.playerChoices.find(c => c.id === choiceId);
+    if (!choice) return;
+    
+    // Check charisma requirement
+    if (choice.requiresCharisma && currentProfile.stats.charisma < choice.requiresCharisma) {
+      return;
+    }
+    
+    // Add messages to history
+    const newHistory: ChatMessage[] = [...profile.chatHistory];
+    newHistory.push({
+      id: `msg-${Date.now()}`,
+      sender: "match",
+      text: currentStep.matchMessage,
+      timestamp: Date.now() - 1000,
+    });
+    newHistory.push({
+      id: `msg-${Date.now() + 1}`,
+      sender: "player",
+      text: choice.text,
+      timestamp: Date.now(),
+    });
+    
+    const newLevel = Math.min(100, profile.relationshipLevel + choice.relationshipChange);
+    const newStatus: DatingStatus = newLevel >= 20 && profile.status === "talking" ? "dating" : profile.status;
+    
+    const updatedProfile: ActiveDatingProfile = {
+      ...profile,
+      chatHistory: newHistory,
+      relationshipLevel: newLevel,
+      currentChatStep: choice.nextMessageId ?? (currentStep.isTerminal ? undefined : profile.currentChatStep),
+      lastInteractionWeek: currentProfile.currentWeek,
+      status: newStatus,
+    };
+    
+    const newProfiles = [...datingState.activeProfiles];
+    newProfiles[profileIndex] = updatedProfile;
+    
+    updateProfile({
+      datingState: {
+        ...datingState,
+        activeProfiles: newProfiles,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const goOnDate = useCallback((profileId: string): { success: boolean; outcome: string; relationshipChange: number } => {
+    if (!currentProfile) return { success: false, outcome: "No profile", relationshipChange: 0 };
+    
+    const datingState = currentProfile.datingState ?? getDefaultDatingState();
+    const profileIndex = datingState.activeProfiles.findIndex(p => p.matchId === profileId);
+    if (profileIndex === -1) return { success: false, outcome: "Match not found", relationshipChange: 0 };
+    
+    const profile = datingState.activeProfiles[profileIndex];
+    const dateCost = GAME_CONSTANTS.DATE_BASE_MONEY_COST + (profile.datesTaken * 25);
+    
+    if (currentProfile.energy < GAME_CONSTANTS.DATE_ENERGY_COST) {
+      return { success: false, outcome: "Not enough energy", relationshipChange: 0 };
+    }
+    if (currentProfile.money < dateCost) {
+      return { success: false, outcome: "Not enough money", relationshipChange: 0 };
+    }
+    
+    // Simulate date outcome based on charisma
+    const charisma = currentProfile.stats.charisma;
+    const roll = Math.random() * 100;
+    const threshold = 20 + (charisma * 0.6);
+    
+    let outcome: string;
+    let relationshipChange: number;
+    
+    if (roll < threshold * 0.3) {
+      outcome = "great";
+      relationshipChange = 15 + Math.floor(Math.random() * 10);
+    } else if (roll < threshold * 0.7) {
+      outcome = "good";
+      relationshipChange = 8 + Math.floor(Math.random() * 7);
+    } else if (roll < threshold) {
+      outcome = "neutral";
+      relationshipChange = 2 + Math.floor(Math.random() * 4);
+    } else if (roll < 90) {
+      outcome = "bad";
+      relationshipChange = -5 - Math.floor(Math.random() * 5);
+    } else {
+      outcome = "disaster";
+      relationshipChange = -15 - Math.floor(Math.random() * 10);
+    }
+    
+    const newLevel = Math.min(100, Math.max(0, profile.relationshipLevel + relationshipChange));
+    const newStatus: DatingStatus = newLevel >= 50 && profile.status === "dating" ? "dating" : profile.status;
+    
+    const updatedProfile: ActiveDatingProfile = {
+      ...profile,
+      relationshipLevel: newLevel,
+      datesTaken: profile.datesTaken + 1,
+      lastInteractionWeek: currentProfile.currentWeek,
+      status: newStatus,
+    };
+    
+    const newProfiles = [...datingState.activeProfiles];
+    newProfiles[profileIndex] = updatedProfile;
+    
+    updateProfile({
+      energy: currentProfile.energy - GAME_CONSTANTS.DATE_ENERGY_COST,
+      money: currentProfile.money - dateCost,
+      datingState: {
+        ...datingState,
+        activeProfiles: newProfiles,
+      },
+    });
+    
+    return { success: true, outcome, relationshipChange };
+  }, [currentProfile, updateProfile]);
+
+  const makeExclusive = useCallback((profileId: string): boolean => {
+    if (!currentProfile) return false;
+    
+    const datingState = currentProfile.datingState ?? getDefaultDatingState();
+    const profileIndex = datingState.activeProfiles.findIndex(p => p.matchId === profileId);
+    if (profileIndex === -1) return false;
+    
+    const profile = datingState.activeProfiles[profileIndex];
+    if (profile.relationshipLevel < 50) return false;
+    
+    // Set this as current partner and mark exclusive
+    const newProfiles = datingState.activeProfiles.map(p => ({
+      ...p,
+      isCurrentPartner: p.matchId === profileId,
+      status: (p.matchId === profileId ? "exclusive" : p.status) as DatingStatus,
+    }));
+    
+    updateProfile({
+      datingState: {
+        ...datingState,
+        activeProfiles: newProfiles,
+        currentPartnerId: profileId,
+      },
+    });
+    
+    return true;
+  }, [currentProfile, updateProfile]);
+
+  const breakUp = useCallback((profileId: string) => {
+    if (!currentProfile) return;
+    
+    const datingState = currentProfile.datingState ?? getDefaultDatingState();
+    const profile = datingState.activeProfiles.find(p => p.matchId === profileId);
+    if (!profile) return;
+    
+    // Add to history
+    const historyEntry = {
+      matchId: profileId,
+      matchName: profile.match.name,
+      peakLevel: profile.relationshipLevel,
+      weekStarted: profile.weekStarted,
+      weekEnded: currentProfile.currentWeek,
+      endReason: "Broke up",
+    };
+    
+    // Remove from active and clear partner if applicable
+    const newProfiles = datingState.activeProfiles.filter(p => p.matchId !== profileId);
+    const newPartnerId = datingState.currentPartnerId === profileId ? null : datingState.currentPartnerId;
+    
+    updateProfile({
+      datingState: {
+        ...datingState,
+        activeProfiles: newProfiles,
+        currentPartnerId: newPartnerId,
+        relationshipHistory: [...datingState.relationshipHistory, historyEntry],
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const getCurrentPartner = useCallback((): ActiveDatingProfile | null => {
+    if (!currentProfile?.datingState?.currentPartnerId) return null;
+    return currentProfile.datingState.activeProfiles.find(
+      p => p.matchId === currentProfile.datingState?.currentPartnerId
+    ) ?? null;
+  }, [currentProfile]);
+
+  const getRelationshipPerks = useCallback((): { mentalToughness: number; energyRecovery: number } => {
+    const partner = getCurrentPartner();
+    if (!partner) return { mentalToughness: 0, energyRecovery: 0 };
+    
+    const level = partner.relationshipLevel;
+    const { tier1, tier2, tier3 } = GAME_CONSTANTS.RELATIONSHIP_PERK_THRESHOLDS;
+    
+    let mentalToughness = 0;
+    let energyRecovery = 0;
+    
+    if (level >= tier1) {
+      mentalToughness += 2;
+      energyRecovery += 5;
+    }
+    if (level >= tier2) {
+      mentalToughness += 3;
+      energyRecovery += 10;
+    }
+    if (level >= tier3) {
+      mentalToughness += 5;
+      energyRecovery += 15;
+    }
+    
+    return { mentalToughness, energyRecovery };
+  }, [getCurrentPartner]);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -1399,6 +1937,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       acceptSponsorOffer,
       cancelSponsorContract,
       incrementTournamentCount,
+      // Weekly Random Events
+      getPendingEvent,
+      resolveEvent,
+      getActiveEventEffects,
+      dismissEvent,
+      // Enhanced Dating
+      getDatingState,
+      refreshMatches,
+      swipeMatch,
+      sendChatMessage,
+      goOnDate,
+      makeExclusive,
+      breakUp,
+      getCurrentPartner,
+      getRelationshipPerks,
     }}>
       {children}
     </GameContext.Provider>
