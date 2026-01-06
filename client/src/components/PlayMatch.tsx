@@ -13,7 +13,8 @@ import {
 import { useGame } from "@/lib/gameContext";
 import type { OilPattern, FrameResult, GameResult, Opponent, Competition } from "@shared/schema";
 import { oilPatternDifficulty } from "@shared/schema";
-import { simulateOpponentGameFrameByFrame } from "@/lib/gameUtils";
+import { simulateOpponentGameFrameByFrame, applyTraitToStats } from "@/lib/gameUtils";
+import { CelebrationOverlay, type CelebrationType } from "@/components/CelebrationOverlay";
 
 interface PlayMatchProps {
   competition: Competition;
@@ -120,7 +121,7 @@ function calculateTotalScore(frames: FrameResult[]): number {
 }
 
 export function PlayMatch({ competition, opponents, gameIndex, onComplete, onForfeit }: PlayMatchProps) {
-  const { currentProfile, addGameResult } = useGame();
+  const { currentProfile, addGameResult, getSettings } = useGame();
   const [playerFrames, setPlayerFrames] = useState<FrameResult[]>([]);
   const [opponentFrames, setOpponentFrames] = useState<FrameResult[]>([]);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -129,6 +130,10 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
   const [gameComplete, setGameComplete] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [allOpponentScores, setAllOpponentScores] = useState<number[]>([]);
+  const [consecutiveStrikes, setConsecutiveStrikes] = useState(0);
+  const [celebration, setCelebration] = useState<CelebrationType>(null);
+  
+  const settings = getSettings();
   
   const oilPattern = competition.oilPattern;
   const featuredOpponentIndex = gameIndex % opponents.length;
@@ -153,6 +158,31 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
     setFeaturedOpponentScore(score);
   }, [featuredOpponent, oilPattern]);
   
+  useEffect(() => {
+    if (!settings.enableAnimations || playerFrames.length === 0) return;
+    
+    const lastFrame = playerFrames[playerFrames.length - 1];
+    if (!lastFrame) return;
+    
+    if (lastFrame.isStrike) {
+      const newStrikes = consecutiveStrikes + 1;
+      setConsecutiveStrikes(newStrikes);
+      
+      if (newStrikes >= 3) {
+        setCelebration("turkey");
+      } else if (newStrikes === 2) {
+        setCelebration("double");
+      } else {
+        setCelebration("strike");
+      }
+    } else if (lastFrame.isSpare) {
+      setConsecutiveStrikes(0);
+      setCelebration("spare");
+    } else if (lastFrame.throw2 !== undefined) {
+      setConsecutiveStrikes(0);
+    }
+  }, [playerFrames.length]);
+  
   if (!currentProfile) return null;
   
   const activeBall = currentProfile.ownedBalls.find(b => b.id === currentProfile.activeBallId) 
@@ -170,9 +200,11 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
     }
     
     const oilDiff = oilPatternDifficulty[oilPattern];
+    const isSpareAttempt = throwNumber > 1 && pinsRemaining < 10;
+    const modifiedStats = applyTraitToStats(currentProfile.stats, currentProfile.trait, currentFrame + 1, isSpareAttempt);
     const pinsKnocked = simulateThrow(
       pinsRemaining,
-      currentProfile.stats,
+      modifiedStats,
       {
         hookPotential: activeBall.hookPotential,
         control: activeBall.control,
@@ -560,6 +592,12 @@ export function PlayMatch({ competition, opponents, gameIndex, onComplete, onFor
           )}
         </CardContent>
       </Card>
+      
+      <CelebrationOverlay 
+        type={celebration}
+        onComplete={() => setCelebration(null)}
+        enabled={settings.enableAnimations}
+      />
     </div>
   );
 }

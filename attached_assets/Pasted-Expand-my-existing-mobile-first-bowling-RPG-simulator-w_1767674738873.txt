@@ -1,0 +1,143 @@
+Expand my existing mobile-first bowling RPG simulator without breaking current saves, UI, or gameplay. All features must integrate cleanly with the current systems (energy, averages, leagues, tournaments, jobs, localStorage).
+
+Top priorities to add (in this order):
+1) Monetization System (in-game logic only)
+2) Animated Lane & Strike Celebrations
+3) Bowling Styles & Traits
+4) Rival System
+5) Achievements & Career Summary
+
+⸻
+
+1) Monetization System (IMPORTANT – design only, no SDKs yet)
+
+Add a Monetization / Shop tab that supports in-app purchases conceptually.
+This should be implemented as in-game logic + UI only (no Google Play / Apple SDK code yet).
+
+Monetization Options
+
+Add multiple purchase options:
+
+A) Permanent Weekly Energy Boost (one-time purchase)
+	•	Example options:
+	•	+10 max weekly energy (permanent)
+	•	+20 max weekly energy (permanent)
+	•	Once purchased:
+	•	Player’s maxEnergy permanently increases
+	•	Persists across weeks and sessions
+	•	Show “Owned” state once purchased
+
+B) One-Time Cash Boosts (consumables)
+	•	Example options:
+	•	$5,000 lump sum
+	•	$15,000 lump sum
+	•	$50,000 lump sum
+	•	These do not repeat weekly
+	•	Can be purchased multiple times
+
+Requirements
+	•	Clearly label purchases as:
+	•	“One-time permanent upgrade”
+	•	“One-time consumable”
+	•	Store purchase flags and history in localStorage
+	•	Do NOT allow pay-to-win stat increases
+	•	Monetization must not bypass the 200 average → Go Pro requirement
+	•	Include a “Restore Purchases” button placeholder (logic only)
+
+Add comments clearly marking:
+	•	Where Google Play / Apple IAP hooks would be added later
+	•	Product IDs as constants (example: energy_boost_10, cash_pack_small)
+
+⸻
+
+2) Animated Lane & Strike Celebrations
+
+Add lightweight visual feedback for gameplay:
+	•	Simple lane graphic (top-down or angled)
+	•	Show ball path as a curved line
+	•	Pins visually react to strikes/spares
+
+Celebration overlays:
+	•	Spare → subtle animation
+	•	Strike → stronger animation
+	•	Double → bigger celebration
+	•	Turkey → biggest celebration
+
+Requirements:
+	•	CSS and/or canvas only
+	•	No external libraries
+	•	Mobile-optimized
+	•	Add Settings toggle to enable/disable celebrations
+
+⸻
+
+3) Bowling Styles & Traits
+
+Add a Bowling Style / Trait system that differentiates builds:
+
+Example traits:
+	•	Power Cranker (higher strike chance, lower consistency)
+	•	Smooth Stroker (high accuracy, lower hook)
+	•	Tweener (balanced)
+	•	Clutch Finisher (late-frame bonuses)
+	•	Spare Specialist (higher spare conversion)
+
+Requirements:
+	•	Traits affect simulation math, not raw stats
+	•	Traits chosen at creation or unlocked later
+	•	Traits visible on player profile
+	•	Traits should not stack infinitely
+
+⸻
+
+4) Rival System
+
+Implement a Rival system:
+	•	Certain opponents are flagged as rivals
+	•	Rivals can be generated organically (frequent matchups) or via events
+
+Rival effects:
+	•	Matches vs rivals are harder
+	•	Wins give extra reputation
+	•	Special match text (“Rival Match!”)
+
+Store:
+	•	Rival name
+	•	Rival record vs player
+
+⸻
+
+5) Achievements & Career Summary
+
+Add:
+
+Achievements System
+	•	First 200 average
+	•	First 300 game
+	•	First league championship
+	•	Going Pro
+	•	Turkey streaks
+
+Career Summary Screen
+	•	Career games played
+	•	Career average
+	•	High game
+	•	Titles won
+	•	Rival record
+	•	Achievement progress
+
+Achievements should:
+	•	Be non-monetized
+	•	Persist per save file
+
+⸻
+
+Technical & Safety Requirements
+	•	Maintain all existing save data
+	•	Migrate saves safely if new fields are added
+	•	Keep mobile UI clean and readable
+	•	All new features must respect energy, money, and progression balance
+	•	Do not auto-simulate events unless user chooses “Sim”
+
+Deliverables:
+Update index.html, style.css, and script.js implementing all five features above. Clearly comment monetization placeholders so they can later be connected to Google Play / Apple IAP without refactoring the game logic.

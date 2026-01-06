@@ -12,7 +12,8 @@ import {
   FastForward,
   ArrowLeft,
   Medal,
-  Zap
+  Zap,
+  Sword
 } from "lucide-react";
 import type { Competition, Opponent, OilPattern, ActiveEvent } from "@shared/schema";
 import { generateOpponents, simulateOpponentGame } from "@/lib/gameUtils";
@@ -82,7 +83,7 @@ export function EventLobby({
     : 0;
   
   const getStandings = () => {
-    const standings: Array<{ name: string; total: number; gamesPlayed: number; avg: number; isPlayer: boolean }> = [];
+    const standings: Array<{ name: string; total: number; gamesPlayed: number; avg: number; isPlayer: boolean; isRival?: boolean }> = [];
     
     standings.push({
       name: "You",
@@ -101,6 +102,7 @@ export function EventLobby({
         gamesPlayed: scores.length,
         avg: scores.length > 0 ? Math.round(total / scores.length) : opp.bowlingAverage,
         isPlayer: false,
+        isRival: opp.isRival,
       });
     });
     
@@ -330,9 +332,17 @@ export function EventLobby({
                       )}
                     </div>
                     <div>
-                      <p className={`font-medium text-sm ${entry.isPlayer ? "text-primary" : ""}`}>
-                        {entry.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className={`font-medium text-sm ${entry.isPlayer ? "text-primary" : entry.isRival ? "text-destructive" : ""}`}>
+                          {entry.name}
+                        </p>
+                        {entry.isRival && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5" data-testid={`badge-rival-${entry.name.replace(/\s+/g, '-').toLowerCase()}`}>
+                            <Sword className="w-3 h-3 mr-0.5" />
+                            Rival
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {entry.gamesPlayed} games - {entry.avg} avg
                       </p>

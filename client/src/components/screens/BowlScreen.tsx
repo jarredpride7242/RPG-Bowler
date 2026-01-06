@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import { Target, Zap, Play, RotateCcw, ChevronLeft, ChevronRight } from "lucide-
 import { useGame } from "@/lib/gameContext";
 import type { OilPattern, FrameResult, GameResult } from "@shared/schema";
 import { oilPatternDifficulty, GAME_CONSTANTS } from "@shared/schema";
+import { CelebrationOverlay, type CelebrationType } from "@/components/CelebrationOverlay";
+import { applyTraitToStats } from "@/lib/gameUtils";
 
 const OIL_PATTERNS: { value: OilPattern; label: string; difficulty: number }[] = [
   { value: "house", label: "House Shot", difficulty: 1 },
@@ -113,7 +115,7 @@ function calculateFrameScore(frames: FrameResult[], frameIndex: number): number 
 }
 
 export function BowlScreen() {
-  const { currentProfile, useEnergy, addGameResult, updateProfile } = useGame();
+  const { currentProfile, useEnergy, addGameResult, updateProfile, getSettings } = useGame();
   const [oilPattern, setOilPattern] = useState<OilPattern>("house");
   const [frames, setFrames] = useState<FrameResult[]>([]);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -121,6 +123,42 @@ export function BowlScreen() {
   const [gameComplete, setGameComplete] = useState(false);
   const [pinsRemaining, setPinsRemaining] = useState(10);
   const [throwNumber, setThrowNumber] = useState(1);
+  const [consecutiveStrikes, setConsecutiveStrikes] = useState(0);
+  const [celebration, setCelebration] = useState<CelebrationType>(null);
+  const [lastThrowResult, setLastThrowResult] = useState<{
+    pinsKnocked: number;
+    isStrike: boolean;
+    isSpare: boolean;
+    throwId: number;
+  } | null>(null);
+  const [throwCounter, setThrowCounter] = useState(0);
+  
+  const settings = getSettings();
+  
+  useEffect(() => {
+    if (!settings.enableAnimations || frames.length === 0) return;
+    
+    const lastFrame = frames[frames.length - 1];
+    if (!lastFrame) return;
+    
+    if (lastFrame.isStrike) {
+      const newStrikes = consecutiveStrikes + 1;
+      setConsecutiveStrikes(newStrikes);
+      
+      if (newStrikes >= 3) {
+        setCelebration("turkey");
+      } else if (newStrikes === 2) {
+        setCelebration("double");
+      } else {
+        setCelebration("strike");
+      }
+    } else if (lastFrame.isSpare) {
+      setConsecutiveStrikes(0);
+      setCelebration("spare");
+    } else if (lastFrame.throw2 !== undefined) {
+      setConsecutiveStrikes(0);
+    }
+  }, [frames.length]);
   
   if (!currentProfile) return null;
   
@@ -135,15 +173,21 @@ export function BowlScreen() {
     setThrowNumber(1);
     setIsPlaying(true);
     setGameComplete(false);
+    setConsecutiveStrikes(0);
+    setCelebration(null);
+    setLastThrowResult(null);
+    setThrowCounter(0);
   };
   
   const throwBall = useCallback(() => {
     if (!activeBall || gameComplete) return;
     
     const oilDiff = oilPatternDifficulty[oilPattern];
+    const isSpareAttempt = throwNumber > 1 && pinsRemaining < 10;
+    const modifiedStats = applyTraitToStats(currentProfile.stats, currentProfile.trait, currentFrame + 1, isSpareAttempt);
     const pinsKnocked = simulateThrow(
       pinsRemaining,
-      currentProfile.stats,
+      modifiedStats,
       {
         hookPotential: activeBall.hookPotential,
         control: activeBall.control,
@@ -342,6 +386,9 @@ export function BowlScreen() {
     setThrowNumber(1);
     setIsPlaying(false);
     setGameComplete(false);
+    setConsecutiveStrikes(0);
+    setCelebration(null);
+    setLastThrowResult(null);
   };
   
   const renderFrame = (frameIndex: number) => {
@@ -558,6 +605,12 @@ export function BowlScreen() {
           </Card>
         </>
       )}
+      
+      <CelebrationOverlay 
+        type={celebration}
+        onComplete={() => setCelebration(null)}
+        enabled={settings.enableAnimations}
+      />
     </div>
   );
 }

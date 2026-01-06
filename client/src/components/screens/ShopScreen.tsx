@@ -22,10 +22,15 @@ import {
   Briefcase,
   Zap,
   Home,
-  Heart
+  Heart,
+  Sparkles,
+  Battery,
+  DollarSign,
+  RefreshCw
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import type { BowlingBall, Job, Property, Relationship } from "@shared/schema";
+import type { BowlingBall, Job, Property, Relationship, PurchaseId } from "@shared/schema";
+import { IAP_PRODUCTS, GAME_CONSTANTS } from "@shared/schema";
 
 const BALL_PREFIXES = ["Thunder", "Storm", "Cyclone", "Vortex", "Blaze", "Shadow", "Phantom", "Titan", "Apex", "Quantum"];
 const BALL_SUFFIXES = ["Strike", "Fury", "Force", "Rush", "Wave", "Core", "Pro", "Elite", "Master", "X"];
@@ -195,10 +200,23 @@ const DATING_PROFILES: Relationship[] = [
 ];
 
 export function ShopScreen() {
-  const { currentProfile, addBowlingBall, setActiveBall, spendMoney, useEnergy, setCurrentJob, updateProfile } = useGame();
+  const { 
+    currentProfile, 
+    addBowlingBall, 
+    setActiveBall, 
+    spendMoney, 
+    useEnergy, 
+    setCurrentJob, 
+    updateProfile,
+    makePurchase,
+    hasPurchased,
+    restorePurchases,
+    getMaxEnergy
+  } = useGame();
   const [selectedBall, setSelectedBall] = useState<BowlingBall | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseId | null>(null);
   
   if (!currentProfile) return null;
   
@@ -283,22 +301,26 @@ export function ShopScreen() {
       </div>
       
       <Tabs defaultValue="balls" className="w-full">
-        <TabsList className="w-full grid grid-cols-4">
-          <TabsTrigger value="balls" className="text-xs">
-            <CircleDot className="w-3.5 h-3.5 mr-1" />
+        <TabsList className="w-full grid grid-cols-5">
+          <TabsTrigger value="balls" className="text-xs px-1">
+            <CircleDot className="w-3.5 h-3.5 mr-0.5" />
             Balls
           </TabsTrigger>
-          <TabsTrigger value="jobs" className="text-xs">
-            <Briefcase className="w-3.5 h-3.5 mr-1" />
+          <TabsTrigger value="jobs" className="text-xs px-1">
+            <Briefcase className="w-3.5 h-3.5 mr-0.5" />
             Jobs
           </TabsTrigger>
-          <TabsTrigger value="property" className="text-xs">
-            <Home className="w-3.5 h-3.5 mr-1" />
+          <TabsTrigger value="property" className="text-xs px-1">
+            <Home className="w-3.5 h-3.5 mr-0.5" />
             Home
           </TabsTrigger>
-          <TabsTrigger value="dating" className="text-xs">
-            <Heart className="w-3.5 h-3.5 mr-1" />
+          <TabsTrigger value="dating" className="text-xs px-1">
+            <Heart className="w-3.5 h-3.5 mr-0.5" />
             Dating
+          </TabsTrigger>
+          <TabsTrigger value="premium" className="text-xs px-1">
+            <Sparkles className="w-3.5 h-3.5 mr-0.5" />
+            Store
           </TabsTrigger>
         </TabsList>
         
@@ -610,6 +632,119 @@ export function ShopScreen() {
             );
           })}
         </TabsContent>
+        
+        <TabsContent value="premium" className="space-y-4 mt-4">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Battery className="w-4 h-4" />
+                Current Energy Capacity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-sm">Base Max Energy</span>
+                <span className="font-bold">{getMaxEnergy()}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Energy refills each week. Purchase boosts below to permanently increase your capacity.
+              </p>
+            </CardContent>
+          </Card>
+          
+          <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Zap className="w-4 h-4" />
+            Energy Boosts (Permanent)
+          </h2>
+          
+          {(["energy_boost_10", "energy_boost_20"] as PurchaseId[]).map((purchaseId) => {
+            const product = IAP_PRODUCTS[purchaseId];
+            const owned = hasPurchased(purchaseId);
+            
+            return (
+              <Card key={purchaseId} className={owned ? "opacity-60" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.description}</p>
+                        <Badge variant="outline" className="mt-1 text-xs">One-time permanent upgrade</Badge>
+                      </div>
+                    </div>
+                    {owned ? (
+                      <Badge variant="secondary">
+                        <Check className="w-3 h-3 mr-1" />
+                        Owned
+                      </Badge>
+                    ) : (
+                      <Button 
+                        size="sm"
+                        onClick={() => setSelectedPurchase(purchaseId)}
+                        data-testid={`button-buy-${purchaseId}`}
+                      >
+                        {product.price}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          
+          <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2 mt-4">
+            <DollarSign className="w-4 h-4" />
+            Cash Packs (One-Time)
+          </h2>
+          
+          {(["cash_pack_small", "cash_pack_medium", "cash_pack_large"] as PurchaseId[]).map((purchaseId) => {
+            const product = IAP_PRODUCTS[purchaseId];
+            
+            return (
+              <Card key={purchaseId}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-chart-3/20 flex items-center justify-center">
+                        <Coins className="w-5 h-5 text-chart-3" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.description}</p>
+                        <Badge variant="outline" className="mt-1 text-xs">One-time consumable</Badge>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm"
+                      onClick={() => setSelectedPurchase(purchaseId)}
+                      data-testid={`button-buy-${purchaseId}`}
+                    >
+                      {product.price}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+          
+          <div className="pt-4 border-t">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={restorePurchases}
+              data-testid="button-restore-purchases"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Restore Purchases
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              If you've made purchases on another device, tap to restore them.
+            </p>
+          </div>
+        </TabsContent>
       </Tabs>
       
       <AlertDialog open={selectedBall !== null} onOpenChange={() => setSelectedBall(null)}>
@@ -659,6 +794,40 @@ export function ShopScreen() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRentProperty}>
               Move In
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={selectedPurchase !== null} onOpenChange={() => setSelectedPurchase(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {selectedPurchase ? IAP_PRODUCTS[selectedPurchase].name : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>{selectedPurchase ? IAP_PRODUCTS[selectedPurchase].description : ""}</p>
+                <p className="mt-2 font-medium">
+                  Price: {selectedPurchase ? IAP_PRODUCTS[selectedPurchase].price : ""}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {selectedPurchase && IAP_PRODUCTS[selectedPurchase].type === "permanent" 
+                    ? "This is a one-time permanent upgrade that will persist across all sessions."
+                    : "This is a one-time consumable purchase."}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (selectedPurchase) {
+                makePurchase(selectedPurchase);
+                setSelectedPurchase(null);
+              }
+            }}>
+              Purchase
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

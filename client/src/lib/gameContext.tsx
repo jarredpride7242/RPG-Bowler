@@ -11,9 +11,17 @@ import type {
   Relationship,
   Property,
   GameResult,
-  Sponsor
+  Sponsor,
+  BowlingTrait,
+  Rivalry,
+  Achievement,
+  AchievementId,
+  PurchaseId,
+  PurchaseRecord,
+  GameSettings,
+  CareerStats
 } from "@shared/schema";
-import { GAME_CONSTANTS } from "@shared/schema";
+import { GAME_CONSTANTS, IAP_PRODUCTS, ACHIEVEMENT_INFO } from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
 
@@ -89,7 +97,7 @@ interface GameContextType {
   currentSlot: number | null;
   isPlaying: boolean;
   
-  createNewGame: (slotId: number, firstName: string, lastName: string, style: BowlingStyle, handedness: Handedness) => void;
+  createNewGame: (slotId: number, firstName: string, lastName: string, style: BowlingStyle, handedness: Handedness, trait?: BowlingTrait) => void;
   loadGame: (slotId: number) => void;
   saveCurrentGame: () => void;
   deleteGame: (slotId: number) => void;
@@ -110,6 +118,18 @@ interface GameContextType {
   addGameResult: (result: GameResult) => void;
   
   goProfessional: () => boolean;
+  
+  // New feature handlers
+  setTrait: (trait: BowlingTrait) => void;
+  makePurchase: (purchaseId: PurchaseId) => boolean;
+  hasPurchased: (purchaseId: PurchaseId) => boolean;
+  restorePurchases: () => void;
+  updateSettings: (settings: Partial<GameSettings>) => void;
+  getMaxEnergy: () => number;
+  updateRivalry: (opponentId: string, opponentName: string, won: boolean) => void;
+  checkAndAwardAchievements: () => void;
+  hasAchievement: (achievementId: AchievementId) => boolean;
+  updateCareerStats: (updates: Partial<CareerStats>) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -132,7 +152,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     firstName: string, 
     lastName: string, 
     style: BowlingStyle, 
-    handedness: Handedness
+    handedness: Handedness,
+    trait?: BowlingTrait
   ) => {
     const starterBall = generateStarterBall();
     const newProfile: PlayerProfile = {
@@ -144,6 +165,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       stats: generateStarterStats(),
       money: GAME_CONSTANTS.STARTING_MONEY,
       energy: GAME_CONSTANTS.STARTING_ENERGY,
+      maxEnergy: GAME_CONSTANTS.MAX_ENERGY,
       currentWeek: 1,
       currentSeason: 1,
       bowlingAverage: 0,
@@ -157,6 +179,28 @@ export function GameProvider({ children }: { children: ReactNode }) {
       activeSponsors: [],
       gameHistory: [],
       achievements: [],
+      trait: trait || "tweener",
+      rivalries: [],
+      earnedAchievements: [],
+      purchases: [],
+      settings: {
+        celebrationsEnabled: true,
+        soundEnabled: true,
+        darkMode: true,
+      },
+      careerStats: {
+        highGame: 0,
+        totalStrikes: 0,
+        totalSpares: 0,
+        totalTurkeys: 0,
+        totalDoubles: 0,
+        perfectGames: 0,
+        leagueWins: 0,
+        tournamentWins: 0,
+        totalEarnings: 0,
+        rivalWins: 0,
+        longestStrikeStreak: 0,
+      },
     };
 
     setGameState(prev => ({
@@ -263,8 +307,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       newSeason += 1;
     }
     
-    // Calculate max energy (base + property bonus)
-    let maxEnergy = GAME_CONSTANTS.MAX_ENERGY;
+    // Calculate max energy (base + purchased boosts + property bonus)
+    let maxEnergy = currentProfile.maxEnergy ?? GAME_CONSTANTS.MAX_ENERGY;
     if (currentProfile.currentProperty) {
       maxEnergy += currentProfile.currentProperty.energyBonus;
     }
@@ -365,6 +409,213 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return true;
   }, [currentProfile, updateProfile]);
 
+  // ============================================
+  // NEW FEATURE HANDLERS
+  // ============================================
+
+  const setTrait = useCallback((trait: BowlingTrait) => {
+    updateProfile({ trait });
+  }, [updateProfile]);
+
+  const getMaxEnergy = useCallback((): number => {
+    if (!currentProfile) return GAME_CONSTANTS.MAX_ENERGY;
+    
+    let maxEnergy = currentProfile.maxEnergy ?? GAME_CONSTANTS.MAX_ENERGY;
+    
+    if (currentProfile.currentProperty) {
+      maxEnergy += currentProfile.currentProperty.energyBonus;
+    }
+    
+    return maxEnergy;
+  }, [currentProfile]);
+
+  const hasPurchased = useCallback((purchaseId: PurchaseId): boolean => {
+    if (!currentProfile) return false;
+    const purchases = currentProfile.purchases ?? [];
+    return purchases.some(p => p.purchaseId === purchaseId);
+  }, [currentProfile]);
+
+  const makePurchase = useCallback((purchaseId: PurchaseId): boolean => {
+    if (!currentProfile) return false;
+    
+    const product = IAP_PRODUCTS[purchaseId];
+    if (!product) return false;
+    
+    // Check if already purchased (for permanent items)
+    if (product.type === "permanent" && hasPurchased(purchaseId)) {
+      return false;
+    }
+    
+    // TODO: Here is where Google Play / Apple IAP integration would hook in
+    // The actual payment flow would be:
+    // 1. Call platform-specific purchase API
+    // 2. Wait for confirmation
+    // 3. Validate receipt server-side
+    // 4. Then apply the purchase effect
+    // For now, we simulate successful purchase
+    
+    const newPurchase: PurchaseRecord = {
+      purchaseId,
+      purchasedAt: new Date().toISOString(),
+      quantity: 1,
+    };
+    
+    const purchases = [...(currentProfile.purchases ?? []), newPurchase];
+    
+    // Apply effects
+    let updates: Partial<PlayerProfile> = { purchases };
+    
+    if ("maxEnergyBoost" in product.effect) {
+      const currentMax = currentProfile.maxEnergy ?? GAME_CONSTANTS.MAX_ENERGY;
+      updates.maxEnergy = currentMax + product.effect.maxEnergyBoost;
+    }
+    
+    if ("cashBoost" in product.effect) {
+      updates.money = currentProfile.money + product.effect.cashBoost;
+    }
+    
+    updateProfile(updates);
+    return true;
+  }, [currentProfile, hasPurchased, updateProfile]);
+
+  const restorePurchases = useCallback(() => {
+    // TODO: This is where platform-specific restore purchases logic would go
+    // For Google Play: Call BillingClient.queryPurchasesAsync()
+    // For Apple: Call SKPaymentQueue.restoreCompletedTransactions()
+    // Then iterate through valid purchases and re-apply effects
+    console.log("Restore purchases placeholder - would connect to IAP API here");
+  }, []);
+
+  const updateSettings = useCallback((settings: Partial<GameSettings>) => {
+    if (!currentProfile) return;
+    const currentSettings = currentProfile.settings ?? {
+      celebrationsEnabled: true,
+      soundEnabled: true,
+      darkMode: true,
+    };
+    updateProfile({ settings: { ...currentSettings, ...settings } });
+  }, [currentProfile, updateProfile]);
+
+  const updateRivalry = useCallback((opponentId: string, opponentName: string, won: boolean) => {
+    if (!currentProfile) return;
+    
+    const rivalries = [...(currentProfile.rivalries ?? [])];
+    const existingIndex = rivalries.findIndex(r => r.opponentId === opponentId);
+    
+    if (existingIndex >= 0) {
+      const existing = rivalries[existingIndex];
+      rivalries[existingIndex] = {
+        ...existing,
+        wins: won ? existing.wins + 1 : existing.wins,
+        losses: won ? existing.losses : existing.losses + 1,
+        lastMatchWeek: currentProfile.currentWeek,
+        lastMatchSeason: currentProfile.currentSeason,
+      };
+    } else {
+      rivalries.push({
+        opponentId,
+        opponentName,
+        wins: won ? 1 : 0,
+        losses: won ? 0 : 1,
+        lastMatchWeek: currentProfile.currentWeek,
+        lastMatchSeason: currentProfile.currentSeason,
+      });
+    }
+    
+    // Update career stats if won against rival
+    if (won) {
+      const careerStats = currentProfile.careerStats ?? {
+        highGame: 0,
+        totalStrikes: 0,
+        totalSpares: 0,
+        totalTurkeys: 0,
+        totalDoubles: 0,
+        perfectGames: 0,
+        leagueWins: 0,
+        tournamentWins: 0,
+        totalEarnings: 0,
+        rivalWins: 0,
+        longestStrikeStreak: 0,
+      };
+      updateProfile({
+        rivalries,
+        careerStats: { ...careerStats, rivalWins: careerStats.rivalWins + 1 },
+      });
+    } else {
+      updateProfile({ rivalries });
+    }
+  }, [currentProfile, updateProfile]);
+
+  const hasAchievement = useCallback((achievementId: AchievementId): boolean => {
+    if (!currentProfile) return false;
+    const earned = currentProfile.earnedAchievements ?? [];
+    return earned.some(a => a.id === achievementId && a.earnedAt);
+  }, [currentProfile]);
+
+  const updateCareerStats = useCallback((updates: Partial<CareerStats>) => {
+    if (!currentProfile) return;
+    const current = currentProfile.careerStats ?? {
+      highGame: 0,
+      totalStrikes: 0,
+      totalSpares: 0,
+      totalTurkeys: 0,
+      totalDoubles: 0,
+      perfectGames: 0,
+      leagueWins: 0,
+      tournamentWins: 0,
+      totalEarnings: 0,
+      rivalWins: 0,
+      longestStrikeStreak: 0,
+    };
+    updateProfile({ careerStats: { ...current, ...updates } });
+  }, [currentProfile, updateProfile]);
+
+  const checkAndAwardAchievements = useCallback(() => {
+    if (!currentProfile) return;
+    
+    const earned = [...(currentProfile.earnedAchievements ?? [])];
+    const careerStats = currentProfile.careerStats ?? {
+      highGame: 0,
+      totalStrikes: 0,
+      totalSpares: 0,
+      totalTurkeys: 0,
+      totalDoubles: 0,
+      perfectGames: 0,
+      leagueWins: 0,
+      tournamentWins: 0,
+      totalEarnings: 0,
+      rivalWins: 0,
+      longestStrikeStreak: 0,
+    };
+    
+    const awardIfNotEarned = (id: AchievementId, condition: boolean) => {
+      const existing = earned.find(a => a.id === id);
+      if (!existing?.earnedAt && condition) {
+        const idx = earned.findIndex(a => a.id === id);
+        if (idx >= 0) {
+          earned[idx] = { ...earned[idx], earnedAt: new Date().toISOString() };
+        } else {
+          earned.push({ id, earnedAt: new Date().toISOString() });
+        }
+      }
+    };
+    
+    // Check each achievement
+    awardIfNotEarned("first_200_average", currentProfile.bowlingAverage >= 200);
+    awardIfNotEarned("first_300_game", careerStats.highGame >= 300);
+    awardIfNotEarned("went_pro", currentProfile.isProfessional);
+    awardIfNotEarned("grinder", currentProfile.totalGamesPlayed >= 100);
+    awardIfNotEarned("veteran", currentProfile.totalGamesPlayed >= 500);
+    awardIfNotEarned("turkey_master", careerStats.totalTurkeys >= 10);
+    awardIfNotEarned("double_specialist", careerStats.totalDoubles >= 25);
+    awardIfNotEarned("money_maker", careerStats.totalEarnings >= 100000);
+    awardIfNotEarned("rival_nemesis", careerStats.rivalWins >= 5);
+    awardIfNotEarned("first_league_championship", careerStats.leagueWins >= 1);
+    awardIfNotEarned("first_tournament_win", careerStats.tournamentWins >= 1);
+    
+    updateProfile({ earnedAchievements: earned });
+  }, [currentProfile, updateProfile]);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -387,6 +638,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setCurrentJob,
       addGameResult,
       goProfessional,
+      setTrait,
+      makePurchase,
+      hasPurchased,
+      restorePurchases,
+      updateSettings,
+      getMaxEnergy,
+      updateRivalry,
+      checkAndAwardAchievements,
+      hasAchievement,
+      updateCareerStats,
     }}>
       {children}
     </GameContext.Provider>

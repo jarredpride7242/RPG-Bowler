@@ -186,6 +186,47 @@ export const sponsorSchema = z.object({
 export type Sponsor = z.infer<typeof sponsorSchema>;
 
 // ============================================
+// BOWLING TRAITS (Character Builds)
+// ============================================
+export const bowlingTraitSchema = z.enum([
+  "power-cranker",     // Higher strike chance, lower consistency
+  "smooth-stroker",    // High accuracy, lower hook
+  "tweener",           // Balanced approach
+  "clutch-finisher",   // Late-frame bonuses
+  "spare-specialist",  // Higher spare conversion
+]);
+
+export type BowlingTrait = z.infer<typeof bowlingTraitSchema>;
+
+export const TRAIT_DESCRIPTIONS: Record<BowlingTrait, { name: string; description: string; effects: string }> = {
+  "power-cranker": { 
+    name: "Power Cranker", 
+    description: "Aggressive high-rev style with explosive hook",
+    effects: "+15% strike chance, -10% consistency" 
+  },
+  "smooth-stroker": { 
+    name: "Smooth Stroker", 
+    description: "Classic accuracy-focused approach",
+    effects: "+15% accuracy, -10% hook power" 
+  },
+  "tweener": { 
+    name: "Tweener", 
+    description: "Versatile balanced style",
+    effects: "+5% all stats, no penalties" 
+  },
+  "clutch-finisher": { 
+    name: "Clutch Finisher", 
+    description: "Performs best under pressure",
+    effects: "+20% in frames 9-10, -5% early frames" 
+  },
+  "spare-specialist": { 
+    name: "Spare Specialist", 
+    description: "Master of spare conversions",
+    effects: "+25% spare conversion, -5% strike chance" 
+  },
+};
+
+// ============================================
 // OPPONENT (NPC bowler)
 // ============================================
 export const opponentSchema = z.object({
@@ -198,9 +239,171 @@ export const opponentSchema = z.object({
   bowlingAverage: z.number(),
   currentSeriesScore: z.number().optional(),
   gamesPlayed: z.number().optional(),
+  trait: bowlingTraitSchema.optional(),
+  isRival: z.boolean().optional(),
 });
 
 export type Opponent = z.infer<typeof opponentSchema>;
+
+// ============================================
+// RIVALRY TRACKING
+// ============================================
+export const rivalrySchema = z.object({
+  opponentId: z.string(),
+  opponentName: z.string(),
+  wins: z.number(),
+  losses: z.number(),
+  lastMatchWeek: z.number(),
+  lastMatchSeason: z.number(),
+});
+
+export type Rivalry = z.infer<typeof rivalrySchema>;
+
+// ============================================
+// ACHIEVEMENTS
+// ============================================
+export const achievementIdSchema = z.enum([
+  "first_200_average",
+  "first_300_game",
+  "first_perfect_game",
+  "first_league_championship",
+  "first_tournament_win",
+  "went_pro",
+  "turkey_master",        // 10 turkeys in career
+  "double_specialist",    // 25 doubles in career
+  "money_maker",          // Earn $100,000 total
+  "grinder",              // Play 100 games
+  "veteran",              // Play 500 games
+  "rival_nemesis",        // Beat a rival 5 times
+  "streak_king",          // 5 strikes in a row
+]);
+
+export type AchievementId = z.infer<typeof achievementIdSchema>;
+
+export const achievementSchema = z.object({
+  id: achievementIdSchema,
+  earnedAt: z.string().optional(),
+  progress: z.number().optional(),
+  target: z.number().optional(),
+});
+
+export type Achievement = z.infer<typeof achievementSchema>;
+
+export const ACHIEVEMENT_INFO: Record<AchievementId, { name: string; description: string; target?: number }> = {
+  "first_200_average": { name: "Rising Star", description: "Achieve a 200 bowling average" },
+  "first_300_game": { name: "Perfect Game", description: "Bowl a 300 game" },
+  "first_perfect_game": { name: "Perfection", description: "Bowl a perfect game in competition" },
+  "first_league_championship": { name: "League Champion", description: "Win your first league championship" },
+  "first_tournament_win": { name: "Tournament Victor", description: "Win your first tournament" },
+  "went_pro": { name: "Professional", description: "Become a professional bowler" },
+  "turkey_master": { name: "Turkey Master", description: "Bowl 10 turkeys in your career", target: 10 },
+  "double_specialist": { name: "Double Specialist", description: "Bowl 25 doubles in your career", target: 25 },
+  "money_maker": { name: "Money Maker", description: "Earn $100,000 total", target: 100000 },
+  "grinder": { name: "Grinder", description: "Play 100 games", target: 100 },
+  "veteran": { name: "Veteran", description: "Play 500 games", target: 500 },
+  "rival_nemesis": { name: "Rival Nemesis", description: "Beat a rival 5 times", target: 5 },
+  "streak_king": { name: "Streak King", description: "Get 5 strikes in a row" },
+};
+
+// ============================================
+// PURCHASES (In-App Purchase Tracking)
+// ============================================
+export const purchaseIdSchema = z.enum([
+  "energy_boost_10",    // +10 max weekly energy (permanent)
+  "energy_boost_20",    // +20 max weekly energy (permanent)
+  "cash_pack_small",    // $5,000 one-time
+  "cash_pack_medium",   // $15,000 one-time
+  "cash_pack_large",    // $50,000 one-time
+]);
+
+export type PurchaseId = z.infer<typeof purchaseIdSchema>;
+
+export const purchaseRecordSchema = z.object({
+  purchaseId: purchaseIdSchema,
+  purchasedAt: z.string(),
+  quantity: z.number().optional(), // For consumables
+});
+
+export type PurchaseRecord = z.infer<typeof purchaseRecordSchema>;
+
+// IAP product definitions (for future Google Play / Apple integration)
+export const IAP_PRODUCTS = {
+  "energy_boost_10": { 
+    name: "+10 Weekly Energy", 
+    description: "Permanently increase your max weekly energy by 10",
+    type: "permanent" as const,
+    price: "$0.99",
+    effect: { maxEnergyBoost: 10 },
+    // TODO: Add Google Play product ID: com.strikeforce.energy_boost_10
+    // TODO: Add Apple product ID: energy_boost_10
+  },
+  "energy_boost_20": { 
+    name: "+20 Weekly Energy", 
+    description: "Permanently increase your max weekly energy by 20",
+    type: "permanent" as const,
+    price: "$1.99",
+    effect: { maxEnergyBoost: 20 },
+    // TODO: Add Google Play product ID: com.strikeforce.energy_boost_20
+    // TODO: Add Apple product ID: energy_boost_20
+  },
+  "cash_pack_small": { 
+    name: "$5,000 Cash Pack", 
+    description: "One-time cash boost of $5,000",
+    type: "consumable" as const,
+    price: "$0.99",
+    effect: { cashBoost: 5000 },
+    // TODO: Add Google Play product ID: com.strikeforce.cash_pack_small
+    // TODO: Add Apple product ID: cash_pack_small
+  },
+  "cash_pack_medium": { 
+    name: "$15,000 Cash Pack", 
+    description: "One-time cash boost of $15,000",
+    type: "consumable" as const,
+    price: "$2.99",
+    effect: { cashBoost: 15000 },
+    // TODO: Add Google Play product ID: com.strikeforce.cash_pack_medium
+    // TODO: Add Apple product ID: cash_pack_medium
+  },
+  "cash_pack_large": { 
+    name: "$50,000 Cash Pack", 
+    description: "One-time cash boost of $50,000",
+    type: "consumable" as const,
+    price: "$4.99",
+    effect: { cashBoost: 50000 },
+    // TODO: Add Google Play product ID: com.strikeforce.cash_pack_large
+    // TODO: Add Apple product ID: cash_pack_large
+  },
+};
+
+// ============================================
+// GAME SETTINGS
+// ============================================
+export const gameSettingsSchema = z.object({
+  celebrationsEnabled: z.boolean().default(true),
+  soundEnabled: z.boolean().default(true),
+  darkMode: z.boolean().default(true),
+});
+
+export type GameSettings = z.infer<typeof gameSettingsSchema>;
+
+// ============================================
+// CAREER STATS (for summary)
+// ============================================
+export const careerStatsSchema = z.object({
+  highGame: z.number().default(0),
+  totalStrikes: z.number().default(0),
+  totalSpares: z.number().default(0),
+  totalTurkeys: z.number().default(0),
+  totalDoubles: z.number().default(0),
+  perfectGames: z.number().default(0),
+  leagueWins: z.number().default(0),
+  tournamentWins: z.number().default(0),
+  totalEarnings: z.number().default(0),
+  rivalWins: z.number().default(0),
+  longestStrikeStreak: z.number().default(0),
+});
+
+export type CareerStats = z.infer<typeof careerStatsSchema>;
 
 // ============================================
 // ACTIVE EVENT STATE
@@ -255,6 +458,7 @@ export const playerProfileSchema = z.object({
   stats: playerStatsSchema,
   money: z.number(),
   energy: z.number(),
+  maxEnergy: z.number().optional(), // Can be boosted via purchases
   currentWeek: z.number(),
   currentSeason: z.number(),
   bowlingAverage: z.number(),
@@ -268,6 +472,13 @@ export const playerProfileSchema = z.object({
   activeSponsors: z.array(sponsorSchema),
   gameHistory: z.array(gameResultSchema),
   achievements: z.array(z.string()),
+  // New fields for expanded features (all optional for backward compatibility)
+  trait: bowlingTraitSchema.optional(),
+  rivalries: z.array(rivalrySchema).optional(),
+  earnedAchievements: z.array(achievementSchema).optional(),
+  purchases: z.array(purchaseRecordSchema).optional(),
+  settings: gameSettingsSchema.optional(),
+  careerStats: careerStatsSchema.optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;

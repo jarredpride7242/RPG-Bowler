@@ -4,16 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, ArrowRight, Target, Hand } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, Target, Hand, Zap } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import type { BowlingStyle, Handedness } from "@shared/schema";
+import type { BowlingStyle, Handedness, BowlingTrait } from "@shared/schema";
+import { TRAIT_DESCRIPTIONS } from "@shared/schema";
 
 interface NewGameSetupProps {
   slotId: number;
   onBack: () => void;
 }
 
-type SetupStep = "name" | "style" | "handedness";
+type SetupStep = "name" | "style" | "handedness" | "trait";
+
+const TRAITS_LIST: BowlingTrait[] = [
+  "tweener",
+  "power-cranker", 
+  "smooth-stroker",
+  "clutch-finisher",
+  "spare-specialist",
+];
 
 export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
   const { createNewGame } = useGame();
@@ -22,6 +32,7 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
   const [lastName, setLastName] = useState("");
   const [bowlingStyle, setBowlingStyle] = useState<BowlingStyle>("one-handed");
   const [handedness, setHandedness] = useState<Handedness>("right");
+  const [trait, setTrait] = useState<BowlingTrait>("tweener");
   
   const canProceed = () => {
     if (step === "name") {
@@ -35,8 +46,10 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
       setStep("style");
     } else if (step === "style") {
       setStep("handedness");
+    } else if (step === "handedness") {
+      setStep("trait");
     } else {
-      createNewGame(slotId, firstName.trim(), lastName.trim(), bowlingStyle, handedness);
+      createNewGame(slotId, firstName.trim(), lastName.trim(), bowlingStyle, handedness, trait);
     }
   };
   
@@ -45,8 +58,19 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
       onBack();
     } else if (step === "style") {
       setStep("name");
-    } else {
+    } else if (step === "handedness") {
       setStep("style");
+    } else {
+      setStep("handedness");
+    }
+  };
+  
+  const getStepNumber = () => {
+    switch (step) {
+      case "name": return 1;
+      case "style": return 2;
+      case "handedness": return 3;
+      case "trait": return 4;
     }
   };
   
@@ -81,18 +105,15 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
         <div className="w-full max-w-md">
           <div className="mb-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Step {step === "name" ? "1" : step === "style" ? "2" : "3"} of 3
+              Step {getStepNumber()} of 4
             </p>
             <div className="flex justify-center gap-2 mt-2">
-              {["name", "style", "handedness"].map((s) => (
+              {["name", "style", "handedness", "trait"].map((s, idx) => (
                 <div 
                   key={s}
-                  className={`h-1.5 w-12 rounded-full transition-colors ${
+                  className={`h-1.5 w-8 rounded-full transition-colors ${
                     s === step ? "bg-primary" : 
-                    (step === "style" && s === "name") || 
-                    (step === "handedness" && s !== "handedness") 
-                      ? "bg-primary/40" 
-                      : "bg-muted"
+                    idx < getStepNumber()! - 1 ? "bg-primary/40" : "bg-muted"
                   }`}
                 />
               ))}
@@ -225,6 +246,53 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
             </Card>
           )}
           
+          {step === "trait" && (
+            <Card>
+              <CardHeader>
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                  <Zap className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle>Bowling Trait</CardTitle>
+                <CardDescription>Choose your signature style - this affects your gameplay</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup 
+                  value={trait} 
+                  onValueChange={(v) => setTrait(v as BowlingTrait)}
+                  className="space-y-3"
+                >
+                  {TRAITS_LIST.map((t) => {
+                    const info = TRAIT_DESCRIPTIONS[t];
+                    return (
+                      <label 
+                        key={t}
+                        className={`
+                          flex items-start gap-4 p-4 rounded-lg border cursor-pointer
+                          transition-all hover-elevate
+                          ${trait === t ? "border-primary bg-primary/5" : "border-border"}
+                        `}
+                      >
+                        <RadioGroupItem 
+                          value={t} 
+                          id={t} 
+                          data-testid={`radio-trait-${t}`}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{info.name}</p>
+                          <p className="text-sm text-muted-foreground">{info.description}</p>
+                          <Badge variant="outline" className="mt-2 text-xs">
+                            {info.effects}
+                          </Badge>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          )}
+          
           <Button
             data-testid="button-next"
             onClick={handleNext}
@@ -232,7 +300,7 @@ export function NewGameSetup({ slotId, onBack }: NewGameSetupProps) {
             className="w-full mt-6"
             size="lg"
           >
-            {step === "handedness" ? "Start Career" : "Continue"}
+            {step === "trait" ? "Start Career" : "Continue"}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>

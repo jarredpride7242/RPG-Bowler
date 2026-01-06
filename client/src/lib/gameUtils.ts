@@ -1,7 +1,76 @@
-import type { BowlingBall, OilPattern, PlayerStats, Sponsor, Opponent, Competition, BowlingStyle, Handedness } from "@shared/schema";
+import type { BowlingBall, OilPattern, PlayerStats, Sponsor, Opponent, Competition, BowlingStyle, Handedness, BowlingTrait } from "@shared/schema";
 import { oilPatternDifficulty, GAME_CONSTANTS } from "@shared/schema";
 
 type CompetitionTier = Competition['tier'];
+
+export interface TraitModifiers {
+  strikeChanceMod: number;
+  spareChanceMod: number;
+  consistencyMod: number;
+  accuracyMod: number;
+  hookMod: number;
+  lateFrameMod: number;
+  earlyFrameMod: number;
+}
+
+export function getTraitModifiers(trait?: BowlingTrait): TraitModifiers {
+  const base: TraitModifiers = {
+    strikeChanceMod: 1.0,
+    spareChanceMod: 1.0,
+    consistencyMod: 1.0,
+    accuracyMod: 1.0,
+    hookMod: 1.0,
+    lateFrameMod: 1.0,
+    earlyFrameMod: 1.0,
+  };
+  
+  if (!trait) return base;
+  
+  switch (trait) {
+    case "power-cranker":
+      return { ...base, strikeChanceMod: 1.15, consistencyMod: 0.90, hookMod: 1.10 };
+    case "smooth-stroker":
+      return { ...base, accuracyMod: 1.15, hookMod: 0.90, spareChanceMod: 1.05 };
+    case "tweener":
+      return { ...base, strikeChanceMod: 1.05, spareChanceMod: 1.05, consistencyMod: 1.05, accuracyMod: 1.05 };
+    case "clutch-finisher":
+      return { ...base, lateFrameMod: 1.20, earlyFrameMod: 0.95 };
+    case "spare-specialist":
+      return { ...base, spareChanceMod: 1.25, strikeChanceMod: 0.95 };
+    default:
+      return base;
+  }
+}
+
+export function applyTraitToStats(
+  stats: PlayerStats, 
+  trait?: BowlingTrait,
+  frameNumber?: number,
+  isSpareAttempt?: boolean
+): PlayerStats {
+  const mods = getTraitModifiers(trait);
+  
+  let frameMod = 1.0;
+  if (frameNumber) {
+    if (frameNumber >= 9) {
+      frameMod = mods.lateFrameMod;
+    } else if (frameNumber <= 3) {
+      frameMod = mods.earlyFrameMod;
+    }
+  }
+  
+  const spareBoost = isSpareAttempt ? mods.spareChanceMod : 1.0;
+  const strikeBoost = !isSpareAttempt ? mods.strikeChanceMod : 1.0;
+  
+  return {
+    ...stats,
+    accuracy: Math.min(99, Math.round(stats.accuracy * mods.accuracyMod * frameMod)),
+    consistency: Math.min(99, Math.round(stats.consistency * mods.consistencyMod)),
+    hookControl: Math.min(99, Math.round(stats.hookControl * mods.hookMod * strikeBoost)),
+    spareShooting: Math.min(99, Math.round(stats.spareShooting * spareBoost)),
+    mentalToughness: Math.min(99, Math.round(stats.mentalToughness * frameMod)),
+  };
+}
 
 // ============================================
 // BOWLING SIMULATION UTILITIES
@@ -348,10 +417,23 @@ function generateOpponentAverage(tier: CompetitionTier): number {
   return Math.floor(avgMin + Math.random() * (avgMax - avgMin));
 }
 
-export function generateOpponent(tier: CompetitionTier): Opponent {
+const OPPONENT_TRAITS: BowlingTrait[] = [
+  "power-cranker",
+  "smooth-stroker",
+  "tweener",
+  "clutch-finisher",
+  "spare-specialist",
+];
+
+export function generateOpponent(tier: CompetitionTier, forceRival: boolean = false): Opponent {
   const { firstName, lastName } = generateOpponentName();
   const styles: BowlingStyle[] = ["one-handed", "two-handed"];
   const hands: Handedness[] = ["left", "right"];
+  const trait = OPPONENT_TRAITS[Math.floor(Math.random() * OPPONENT_TRAITS.length)];
+  const isRival = forceRival || Math.random() < 0.12;
+  
+  const baseStats = generateOpponentStats(tier);
+  const rivalBoost = isRival ? 1.05 : 1.0;
   
   return {
     id: `opp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -359,24 +441,42 @@ export function generateOpponent(tier: CompetitionTier): Opponent {
     lastName,
     bowlingStyle: styles[Math.floor(Math.random() * styles.length)],
     handedness: hands[Math.floor(Math.random() * hands.length)],
-    stats: generateOpponentStats(tier),
-    bowlingAverage: generateOpponentAverage(tier),
+    stats: isRival ? {
+      ...baseStats,
+      accuracy: Math.min(99, Math.round(baseStats.accuracy * rivalBoost)),
+      hookControl: Math.min(99, Math.round(baseStats.hookControl * rivalBoost)),
+      mentalToughness: Math.min(99, Math.round(baseStats.mentalToughness * rivalBoost)),
+    } : baseStats,
+    bowlingAverage: Math.round(generateOpponentAverage(tier) * rivalBoost),
     currentSeriesScore: 0,
     gamesPlayed: 0,
+    trait,
+    isRival,
   };
 }
 
 export function generateOpponents(count: number, tier: CompetitionTier): Opponent[] {
   const usedNames = new Set<string>();
   const opponents: Opponent[] = [];
+  let rivalCount = 0;
+  const maxRivals = Math.max(1, Math.floor(count * 0.15));
   
   while (opponents.length < count) {
-    const opponent = generateOpponent(tier);
+    const forceRival = rivalCount < 1 && opponents.length === count - 1;
+    const opponent = generateOpponent(tier, forceRival);
     const fullName = `${opponent.firstName} ${opponent.lastName}`;
     
     if (!usedNames.has(fullName)) {
       usedNames.add(fullName);
-      opponents.push(opponent);
+      if (opponent.isRival && rivalCount < maxRivals) {
+        rivalCount++;
+        opponents.push(opponent);
+      } else if (!opponent.isRival) {
+        opponents.push(opponent);
+      } else {
+        opponent.isRival = false;
+        opponents.push(opponent);
+      }
     }
   }
   
@@ -393,8 +493,9 @@ export function simulateOpponentGame(
 ): number {
   const oilDiff = oilPatternDifficulty[oilPattern];
   
-  // Base score from opponent average with variance
-  const baseScore = opponent.bowlingAverage;
+  // Base score from opponent average with variance, rivals get bonus
+  const rivalBonus = opponent.isRival ? 5 : 0;
+  const baseScore = opponent.bowlingAverage + rivalBonus;
   const variance = GAME_CONSTANTS.UPSET_FACTOR * 40; // +/- range
   const oilPenalty = (oilDiff - 1) * 5;
   
@@ -430,24 +531,29 @@ export function simulateOpponentGameFrameByFrame(
     const isTenthFrame = frameNum === 10;
     let pinsRemaining = 10;
     
+    // Apply trait modifiers for opponents (rivals already have stat boost from generation)
+    const modifiedStats = applyTraitToStats(opponent.stats, opponent.trait, frameNum, false);
+    
     // First throw
-    const throw1 = simulateThrow(pinsRemaining, false, opponent.stats, ball, oilPattern, frameNum, 100);
+    const throw1 = simulateThrow(pinsRemaining, false, modifiedStats, ball, oilPattern, frameNum, 100);
     pinsRemaining -= throw1;
     
     if (isTenthFrame) {
       if (throw1 === 10) {
         // Strike in 10th - get 2 more throws
         pinsRemaining = 10;
-        const throw2 = simulateThrow(pinsRemaining, false, opponent.stats, ball, oilPattern, frameNum, 100);
+        const throw2 = simulateThrow(pinsRemaining, false, modifiedStats, ball, oilPattern, frameNum, 100);
         pinsRemaining = throw2 === 10 ? 10 : 10 - throw2;
-        const throw3 = simulateThrow(pinsRemaining, throw2 !== 10, opponent.stats, ball, oilPattern, frameNum, 100);
+        const spareStats = applyTraitToStats(opponent.stats, opponent.trait, frameNum, throw2 !== 10);
+        const throw3 = simulateThrow(pinsRemaining, throw2 !== 10, spareStats, ball, oilPattern, frameNum, 100);
         frames.push({ throw1, throw2, throw3, isStrike: true, isSpare: false });
       } else {
         // Not a strike - try for spare
-        const throw2 = simulateThrow(pinsRemaining, true, opponent.stats, ball, oilPattern, frameNum, 100);
+        const spareStats = applyTraitToStats(opponent.stats, opponent.trait, frameNum, true);
+        const throw2 = simulateThrow(pinsRemaining, true, spareStats, ball, oilPattern, frameNum, 100);
         if (throw1 + throw2 === 10) {
           // Spare - get 1 more throw
-          const throw3 = simulateThrow(10, false, opponent.stats, ball, oilPattern, frameNum, 100);
+          const throw3 = simulateThrow(10, false, modifiedStats, ball, oilPattern, frameNum, 100);
           frames.push({ throw1, throw2, throw3, isStrike: false, isSpare: true });
         } else {
           frames.push({ throw1, throw2, isStrike: false, isSpare: false });
@@ -457,7 +563,8 @@ export function simulateOpponentGameFrameByFrame(
       if (throw1 === 10) {
         frames.push({ throw1, isStrike: true, isSpare: false });
       } else {
-        const throw2 = simulateThrow(pinsRemaining, true, opponent.stats, ball, oilPattern, frameNum, 100);
+        const spareStats = applyTraitToStats(opponent.stats, opponent.trait, frameNum, true);
+        const throw2 = simulateThrow(pinsRemaining, true, spareStats, ball, oilPattern, frameNum, 100);
         const isSpare = throw1 + throw2 === 10;
         frames.push({ throw1, throw2, isStrike: false, isSpare });
       }
