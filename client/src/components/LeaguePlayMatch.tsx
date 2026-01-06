@@ -19,8 +19,6 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
   const [gameScores, setGameScores] = useState<{ player: number; opponent: number }[]>([]);
   const [seriesComplete, setSeriesComplete] = useState(false);
   
-  if (!currentProfile) return null;
-  
   const currentWeekNum = league.currentWeek;
   const opponentsExcludingPlayer = league.standings.filter(s => !s.isPlayer);
   const opponentIndex = (currentWeekNum - 1) % opponentsExcludingPlayer.length;
@@ -40,6 +38,8 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
       revRate: 60, laneReading: 60, spareShooting: 65, charisma: 50, reputation: 40,
     },
   }), [opponentStanding?.bowlerId, opponentStanding?.name, opponentStanding?.average]);
+  
+  if (!currentProfile) return null;
   
   const competition: Competition = {
     id: league.id,

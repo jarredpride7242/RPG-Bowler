@@ -34,8 +34,6 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
     tournament.playerGameScores || []
   );
   
-  if (!currentProfile) return null;
-  
   const tierDef = TOURNAMENT_DEFINITIONS[tournament.tier];
   const totalGames = tournament.totalGames;
   const isBracket = tournament.format === "bracket";
@@ -44,22 +42,12 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
   const maxRounds = isBracket ? Math.ceil(Math.log2(tournament.entrants.length)) : 1;
   const currentRound = tournament.currentRound;
   
-  // Get round name for bracket
-  const getRoundName = (round: number, maxRounds: number) => {
-    const roundsFromFinal = maxRounds - round + 1;
-    if (roundsFromFinal === 1) return "Finals";
-    if (roundsFromFinal === 2) return "Semi-Finals";
-    if (roundsFromFinal === 3) return "Quarter-Finals";
-    return `Round ${round}`;
-  };
-  
   // Memoize opponent to prevent re-renders from triggering new opponent score generation
+  // Must be called before any early returns to satisfy React hooks rules
   const currentOpponent = useMemo((): Opponent => {
-    // Filter out player from entrants
     const opponents = tournament.entrants.filter(e => !e.isPlayer);
     
     if (opponents.length === 0) {
-      // Fallback opponent
       return {
         id: "field",
         firstName: "Opponent",
@@ -75,12 +63,8 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
       };
     }
     
-    // For bracket: use current round to pick opponent deterministically
-    // Each round gets a different opponent from the pool
     const opponentIndex = (currentRound - 1) % opponents.length;
     const opponentEntrant = opponents[opponentIndex];
-    
-    // Higher rounds face tougher opponents (higher average)
     const roundBonus = (currentRound - 1) * 5;
     const adjustedAverage = Math.min(220, opponentEntrant.bowlingAverage + roundBonus);
     
@@ -101,6 +85,17 @@ export function TournamentPlayMatch({ tournament, onComplete, onBack }: Tourname
       },
     };
   }, [tournament.entrants, currentRound, tierDef.minAverage]);
+  
+  if (!currentProfile) return null;
+  
+  // Get round name for bracket
+  const getRoundName = (round: number, maxRounds: number) => {
+    const roundsFromFinal = maxRounds - round + 1;
+    if (roundsFromFinal === 1) return "Finals";
+    if (roundsFromFinal === 2) return "Semi-Finals";
+    if (roundsFromFinal === 3) return "Quarter-Finals";
+    return `Round ${round}`;
+  };
   
   const tierToCompTier = (tier: string) => {
     switch (tier) {
