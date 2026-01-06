@@ -1018,6 +1018,101 @@ export const SPONSOR_TEMPLATES: Array<{ id: string; name: string; tier: SponsorT
 ];
 
 // ============================================
+// BOWLING ALLEY ENVIRONMENT CUSTOMIZATION
+// ============================================
+export const laneStyleSchema = z.enum(["classic-wood", "modern-synthetic", "neon-glow", "retro-arcade", "luxury-marble", "cosmic-galaxy"]);
+export type LaneStyle = z.infer<typeof laneStyleSchema>;
+
+export const lightingStyleSchema = z.enum(["standard", "dim-ambient", "cosmic-bowling", "spotlight", "sunset-warm", "ice-blue"]);
+export type LightingStyle = z.infer<typeof lightingStyleSchema>;
+
+export const seatingStyleSchema = z.enum(["basic-bench", "leather-lounge", "retro-booth", "premium-suite", "minimalist-modern", "vip-private"]);
+export type SeatingStyle = z.infer<typeof seatingStyleSchema>;
+
+export const decorationSchema = z.enum(["none", "trophies", "vintage-signs", "neon-signs", "plants", "sports-memorabilia", "championship-banners"]);
+export type Decoration = z.infer<typeof decorationSchema>;
+
+export const floorStyleSchema = z.enum(["carpet-standard", "carpet-galaxy", "hardwood", "polished-concrete", "retro-checkered", "luxury-tile"]);
+export type FloorStyle = z.infer<typeof floorStyleSchema>;
+
+export const alleyEnvironmentItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.enum(["lane", "lighting", "seating", "decoration", "floor", "ambient"]),
+  description: z.string(),
+  icon: z.string(),
+  rarity: z.enum(["common", "uncommon", "rare", "legendary"]),
+  unlockMethod: z.enum(["default", "purchase", "reputation", "achievement", "legacy", "pro-status"]),
+  unlockRequirement: z.object({
+    price: z.number().optional(),
+    reputationRequired: z.number().optional(),
+    achievementId: z.string().optional(),
+    legacyPointsCost: z.number().optional(),
+    requiresPro: z.boolean().optional(),
+  }),
+});
+
+export type AlleyEnvironmentItem = z.infer<typeof alleyEnvironmentItemSchema>;
+
+export const alleyEnvironmentSchema = z.object({
+  laneStyle: z.string().default("classic-wood"),
+  lightingStyle: z.string().default("standard"),
+  seatingStyle: z.string().default("basic-bench"),
+  decoration: z.string().default("none"),
+  floorStyle: z.string().default("carpet-standard"),
+  ambientEffect: z.string().default("none"),
+  unlockedItems: z.array(z.string()).default([]),
+  alleyName: z.string().default("My Bowling Alley"),
+});
+
+export type AlleyEnvironment = z.infer<typeof alleyEnvironmentSchema>;
+
+export const ALLEY_ENVIRONMENT_ITEMS: AlleyEnvironmentItem[] = [
+  // Lanes
+  { id: "lane-classic-wood", name: "Classic Wood", category: "lane", description: "Traditional maple wood lanes", icon: "Layers", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "lane-modern-synthetic", name: "Modern Synthetic", category: "lane", description: "Sleek synthetic lanes", icon: "Layers", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 1000 } },
+  { id: "lane-neon-glow", name: "Neon Glow", category: "lane", description: "UV-reactive glowing lanes", icon: "Layers", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 25 } },
+  { id: "lane-retro-arcade", name: "Retro Arcade", category: "lane", description: "80s arcade-style lanes", icon: "Layers", rarity: "rare", unlockMethod: "purchase", unlockRequirement: { price: 3500 } },
+  { id: "lane-luxury-marble", name: "Luxury Marble", category: "lane", description: "Premium marble-finish lanes", icon: "Layers", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "went_pro" } },
+  { id: "lane-cosmic-galaxy", name: "Cosmic Galaxy", category: "lane", description: "Starfield galaxy lanes", icon: "Layers", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 25 } },
+  // Lighting
+  { id: "light-standard", name: "Standard", category: "lighting", description: "Bright standard lighting", icon: "Lightbulb", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "light-dim-ambient", name: "Dim Ambient", category: "lighting", description: "Soft ambient glow", icon: "Lightbulb", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 500 } },
+  { id: "light-cosmic-bowling", name: "Cosmic Bowling", category: "lighting", description: "Blacklight UV effects", icon: "Lightbulb", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 20 } },
+  { id: "light-spotlight", name: "Spotlight", category: "lighting", description: "Dramatic lane spotlights", icon: "Lightbulb", rarity: "uncommon", unlockMethod: "purchase", unlockRequirement: { price: 1500 } },
+  { id: "light-sunset-warm", name: "Sunset Warm", category: "lighting", description: "Golden hour ambiance", icon: "Lightbulb", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_tournament_win" } },
+  { id: "light-ice-blue", name: "Ice Blue", category: "lighting", description: "Cool blue illumination", icon: "Lightbulb", rarity: "legendary", unlockMethod: "pro-status", unlockRequirement: { requiresPro: true } },
+  // Seating
+  { id: "seat-basic-bench", name: "Basic Bench", category: "seating", description: "Standard bowling benches", icon: "Armchair", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "seat-leather-lounge", name: "Leather Lounge", category: "seating", description: "Comfortable leather chairs", icon: "Armchair", rarity: "common", unlockMethod: "purchase", unlockRequirement: { price: 800 } },
+  { id: "seat-retro-booth", name: "Retro Booth", category: "seating", description: "Classic diner-style booths", icon: "Armchair", rarity: "uncommon", unlockMethod: "purchase", unlockRequirement: { price: 1800 } },
+  { id: "seat-premium-suite", name: "Premium Suite", category: "seating", description: "Luxury recliner seating", icon: "Armchair", rarity: "rare", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 50 } },
+  { id: "seat-minimalist-modern", name: "Minimalist Modern", category: "seating", description: "Sleek modern design", icon: "Armchair", rarity: "rare", unlockMethod: "purchase", unlockRequirement: { price: 3000 } },
+  { id: "seat-vip-private", name: "VIP Private", category: "seating", description: "Exclusive private booth", icon: "Armchair", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 15 } },
+  // Decorations
+  { id: "deco-none", name: "None", category: "decoration", description: "Clean, minimal look", icon: "Square", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "deco-trophies", name: "Trophy Display", category: "decoration", description: "Your tournament trophies", icon: "Trophy", rarity: "common", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_tournament_win" } },
+  { id: "deco-vintage-signs", name: "Vintage Signs", category: "decoration", description: "Classic bowling signs", icon: "Image", rarity: "uncommon", unlockMethod: "purchase", unlockRequirement: { price: 600 } },
+  { id: "deco-neon-signs", name: "Neon Signs", category: "decoration", description: "Glowing neon artwork", icon: "Zap", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 30 } },
+  { id: "deco-plants", name: "Indoor Plants", category: "decoration", description: "Lush greenery accents", icon: "Leaf", rarity: "rare", unlockMethod: "purchase", unlockRequirement: { price: 1200 } },
+  { id: "deco-sports-memorabilia", name: "Sports Memorabilia", category: "decoration", description: "Signed bowling artifacts", icon: "Medal", rarity: "rare", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 60 } },
+  { id: "deco-championship-banners", name: "Championship Banners", category: "decoration", description: "Your championship banners", icon: "Flag", rarity: "legendary", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_league_championship" } },
+  // Floors
+  { id: "floor-carpet-standard", name: "Standard Carpet", category: "floor", description: "Classic bowling alley carpet", icon: "Grid3X3", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "floor-carpet-galaxy", name: "Galaxy Carpet", category: "floor", description: "Space-themed carpet", icon: "Grid3X3", rarity: "uncommon", unlockMethod: "purchase", unlockRequirement: { price: 1000 } },
+  { id: "floor-hardwood", name: "Hardwood", category: "floor", description: "Premium hardwood floors", icon: "Grid3X3", rarity: "uncommon", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 35 } },
+  { id: "floor-polished-concrete", name: "Polished Concrete", category: "floor", description: "Modern industrial style", icon: "Grid3X3", rarity: "rare", unlockMethod: "purchase", unlockRequirement: { price: 2000 } },
+  { id: "floor-retro-checkered", name: "Retro Checkered", category: "floor", description: "Classic checkered pattern", icon: "Grid3X3", rarity: "rare", unlockMethod: "purchase", unlockRequirement: { price: 2500 } },
+  { id: "floor-luxury-tile", name: "Luxury Tile", category: "floor", description: "Elegant marble tiles", icon: "Grid3X3", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 20 } },
+  // Ambient Effects
+  { id: "ambient-none", name: "No Effect", category: "ambient", description: "Standard atmosphere", icon: "Circle", rarity: "common", unlockMethod: "default", unlockRequirement: {} },
+  { id: "ambient-fog", name: "Light Fog", category: "ambient", description: "Subtle fog machine", icon: "Cloud", rarity: "uncommon", unlockMethod: "purchase", unlockRequirement: { price: 750 } },
+  { id: "ambient-laser", name: "Laser Show", category: "ambient", description: "Moving laser patterns", icon: "Sparkles", rarity: "rare", unlockMethod: "reputation", unlockRequirement: { reputationRequired: 45 } },
+  { id: "ambient-confetti", name: "Celebration Confetti", category: "ambient", description: "Confetti on strikes", icon: "PartyPopper", rarity: "rare", unlockMethod: "achievement", unlockRequirement: { achievementId: "first_300_game" } },
+  { id: "ambient-fireworks", name: "Mini Fireworks", category: "ambient", description: "Firework effects", icon: "Flame", rarity: "legendary", unlockMethod: "legacy", unlockRequirement: { legacyPointsCost: 30 } },
+];
+
+// ============================================
 // GAME SETTINGS
 // ============================================
 export const gameSettingsSchema = z.object({
