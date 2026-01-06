@@ -40,7 +40,8 @@ import {
   Palette,
   Trophy,
   Award,
-  Lock
+  Lock,
+  Layers
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
 import { useTheme } from "@/lib/themeContext";
@@ -53,6 +54,7 @@ import { CosmeticsTab } from "@/components/CosmeticsTab";
 import { AchievementsRecordsTab } from "@/components/AchievementsRecordsTab";
 import { HallOfFamePanel } from "@/components/HallOfFamePanel";
 import { SponsorNegotiationPanel } from "@/components/SponsorNegotiationPanel";
+import { AlleyTab } from "@/components/AlleyTab";
 
 const STAT_ICONS: Record<string, typeof Target> = {
   throwPower: Zap,
@@ -217,6 +219,9 @@ export function ProfileScreen() {
             <TabsTrigger value="legacy" className="text-xs px-2 shrink-0" data-testid="tab-legacy">
               <Crown className="w-4 h-4" />
             </TabsTrigger>
+            <TabsTrigger value="alley" className="text-xs px-2 shrink-0" data-testid="tab-alley">
+              <Layers className="w-4 h-4" />
+            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
@@ -335,6 +340,10 @@ export function ProfileScreen() {
         <TabsContent value="legacy" className="mt-4 space-y-4">
           <LegacyPanel />
           <HallOfFamePanel />
+        </TabsContent>
+        
+        <TabsContent value="alley" className="mt-4">
+          <AlleyTab />
         </TabsContent>
       </Tabs>
       
