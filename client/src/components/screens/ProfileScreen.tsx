@@ -30,7 +30,6 @@ import {
   Eye,
   Wrench,
   Heart,
-  HeartHandshake,
   Sparkles,
   Star,
   Save,
@@ -56,7 +55,6 @@ import { AchievementsRecordsTab } from "@/components/AchievementsRecordsTab";
 import { HallOfFamePanel } from "@/components/HallOfFamePanel";
 import { SponsorNegotiationPanel } from "@/components/SponsorNegotiationPanel";
 import { AlleyTab } from "@/components/AlleyTab";
-import { DatingTab } from "@/components/DatingTab";
 
 const STAT_ICONS: Record<string, typeof Target> = {
   throwPower: Zap,
@@ -224,9 +222,6 @@ export function ProfileScreen() {
             <TabsTrigger value="alley" className="text-xs px-2 shrink-0" data-testid="tab-alley">
               <Layers className="w-4 h-4" />
             </TabsTrigger>
-            <TabsTrigger value="dating" className="text-xs px-2 shrink-0" data-testid="tab-dating">
-              <HeartHandshake className="w-4 h-4" />
-            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
@@ -349,10 +344,6 @@ export function ProfileScreen() {
         
         <TabsContent value="alley" className="mt-4">
           <AlleyTab />
-        </TabsContent>
-        
-        <TabsContent value="dating" className="mt-4">
-          <DatingTab />
         </TabsContent>
       </Tabs>
       

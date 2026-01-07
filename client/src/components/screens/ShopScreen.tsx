@@ -40,7 +40,7 @@ import {
   Star
 } from "lucide-react";
 import { useGame } from "@/lib/gameContext";
-import type { BowlingBall, Job, Property, Relationship, PurchaseId, BallRarity } from "@shared/schema";
+import type { BowlingBall, Job, Property, PurchaseId, BallRarity } from "@shared/schema";
 import { IAP_PRODUCTS, GAME_CONSTANTS } from "@shared/schema";
 import { BallVisual } from "@/components/BallVisual";
 import { BallDetailModal } from "@/components/BallDetailModal";
@@ -53,6 +53,7 @@ import {
   filterBallsByRarity,
   type SortOption
 } from "@/lib/ballGenerator";
+import { DatingTab } from "@/components/DatingTab";
 
 const RARITY_COLORS: Record<BallRarity, string> = {
   common: "bg-zinc-600 text-zinc-100",
@@ -137,12 +138,6 @@ const AVAILABLE_PROPERTIES: Property[] = [
   },
 ];
 
-const DATING_PROFILES: Relationship[] = [
-  { id: "alex", name: "Alex", level: 0, buffs: { mentalToughness: 3, energyRecovery: 2 } },
-  { id: "jordan", name: "Jordan", level: 0, buffs: { mentalToughness: 5 } },
-  { id: "taylor", name: "Taylor", level: 0, buffs: { energyRecovery: 5 } },
-  { id: "morgan", name: "Morgan", level: 0, buffs: { mentalToughness: 2, energyRecovery: 3 } },
-];
 
 export function ShopScreen() {
   const { 
@@ -214,25 +209,7 @@ export function ShopScreen() {
     setSelectedProperty(null);
   };
   
-  const handleDate = (profile: Relationship) => {
-    if (!spendMoney(50)) return;
-    if (!useEnergy(10)) return;
     
-    const existingRel = currentProfile.relationships.find(r => r.id === profile.id);
-    if (existingRel) {
-      const newLevel = Math.min(100, existingRel.level + 5 + Math.floor(Math.random() * 5));
-      updateProfile({
-        relationships: currentProfile.relationships.map(r => 
-          r.id === profile.id ? { ...r, level: newLevel } : r
-        ),
-      });
-    } else {
-      updateProfile({
-        relationships: [...currentProfile.relationships, { ...profile, level: 10 }],
-      });
-    }
-  };
-  
   const renderStatBar = (label: string, value: number) => (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground w-20">{label}</span>
@@ -640,57 +617,7 @@ export function ShopScreen() {
         </TabsContent>
         
         <TabsContent value="dating" className="space-y-4 mt-4">
-          <p className="text-sm text-muted-foreground">
-            Build relationships to gain permanent buffs
-          </p>
-          
-          {DATING_PROFILES.map((profile) => {
-            const existingRel = currentProfile.relationships.find(r => r.id === profile.id);
-            const level = existingRel?.level ?? 0;
-            
-            return (
-              <Card key={profile.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-                      <Heart className={`w-5 h-5 ${level > 0 ? "text-primary" : "text-muted-foreground"}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{profile.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Progress value={level} className="h-1.5 flex-1" />
-                        <span className="text-xs text-muted-foreground">{level}%</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-                    <span>Buffs:</span>
-                    {profile.buffs?.mentalToughness && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{profile.buffs.mentalToughness} Mental
-                      </Badge>
-                    )}
-                    {profile.buffs?.energyRecovery && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{profile.buffs.energyRecovery} Energy
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <Button 
-                    className="w-full"
-                    variant="outline"
-                    disabled={currentProfile.money < 50 || currentProfile.energy < 10}
-                    onClick={() => handleDate(profile)}
-                    data-testid={`button-date-${profile.id}`}
-                  >
-                    Go on Date ($50 + 10 Energy)
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+          <DatingTab />
         </TabsContent>
         
         <TabsContent value="premium" className="space-y-4 mt-4">

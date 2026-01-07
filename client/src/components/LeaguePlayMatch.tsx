@@ -21,7 +21,8 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
   
   const currentWeekNum = league.currentWeek;
   const opponentsExcludingPlayer = league.standings.filter(s => !s.isPlayer);
-  const opponentIndex = (currentWeekNum - 1) % opponentsExcludingPlayer.length;
+  const opponentCount = opponentsExcludingPlayer.length || 1;
+  const opponentIndex = (currentWeekNum - 1) % opponentCount;
   const opponentStanding = opponentsExcludingPlayer[opponentIndex];
   
   // Memoize opponent to prevent re-renders from triggering new opponent score generation
@@ -70,7 +71,10 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
     const totalPlayer = gameScores.reduce((sum, g) => sum + g.player, 0);
     const totalOpp = gameScores.reduce((sum, g) => sum + g.opponent, 0);
     const playerWon = totalPlayer > totalOpp;
-    const playerPoints = playerWon ? 2 : (totalPlayer === totalOpp ? 1 : 0);
+    const opponentWon = totalOpp > totalPlayer;
+    const isTied = totalPlayer === totalOpp;
+    const playerPoints = playerWon ? 2 : (isTied ? 1 : 0);
+    const opponentPoints = opponentWon ? 2 : (isTied ? 1 : 0);
     
     const newWeekResult = {
       week: currentWeekNum,
@@ -90,7 +94,7 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
         return {
           ...s,
           wins: s.wins + (playerWon ? 1 : 0),
-          losses: s.losses + (playerWon ? 0 : 1),
+          losses: s.losses + (playerWon || isTied ? 0 : 1),
           points: s.points + playerPoints,
           totalPins: s.totalPins + totalPlayer,
           gamesPlayed: s.gamesPlayed + 3,
@@ -100,9 +104,9 @@ export function LeaguePlayMatch({ league, onComplete, onBack }: LeaguePlayMatchP
       if (s.bowlerId === opponentStanding?.bowlerId) {
         return {
           ...s,
-          wins: s.wins + (playerWon ? 0 : 1),
-          losses: s.losses + (playerWon ? 1 : 0),
-          points: s.points + (2 - playerPoints),
+          wins: s.wins + (opponentWon ? 1 : 0),
+          losses: s.losses + (opponentWon || isTied ? 0 : 1),
+          points: s.points + opponentPoints,
           totalPins: s.totalPins + totalOpp,
           gamesPlayed: s.gamesPlayed + 3,
           average: Math.round((s.totalPins + totalOpp) / (s.gamesPlayed + 3)),
