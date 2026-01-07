@@ -182,6 +182,67 @@ export function simulateLeagueWeek(league: ActiveLeague, playerScores: number[])
   const playerWon = playerTotal > opponentTotal;
   const pointsEarned = playerWon ? 2 : (playerTotal === opponentTotal ? 1 : 0);
   
+  // Create matchups for all non-player opponents (excluding the one playing the player)
+  const opponentsNotPlayingPlayer = nonPlayerStandings.filter(s => s.bowlerId !== opponent.bowlerId);
+  
+  // Pair up opponents for head-to-head matches
+  // Use a round-robin style pairing based on current week
+  const matchups: Map<string, { opponentId: string; won: boolean; tied: boolean; pointsWon: number; total: number; scores: number[] }> = new Map();
+  
+  // Shuffle opponents deterministically based on week for varied matchups
+  const shuffledOpponents = [...opponentsNotPlayingPlayer].sort((a, b) => {
+    const hashA = (a.bowlerId.charCodeAt(0) + league.currentWeek * 7) % 100;
+    const hashB = (b.bowlerId.charCodeAt(0) + league.currentWeek * 7) % 100;
+    return hashA - hashB;
+  });
+  
+  // Pair opponents: first plays second, third plays fourth, etc.
+  for (let i = 0; i < shuffledOpponents.length - 1; i += 2) {
+    const bowler1 = shuffledOpponents[i];
+    const bowler2 = shuffledOpponents[i + 1];
+    
+    const scores1 = [0, 0, 0].map(() => simulateOpponentLeagueGame(bowler1.average || 150, league.oilPattern));
+    const scores2 = [0, 0, 0].map(() => simulateOpponentLeagueGame(bowler2.average || 150, league.oilPattern));
+    const total1 = scores1.reduce((a, b) => a + b, 0);
+    const total2 = scores2.reduce((a, b) => a + b, 0);
+    
+    const bowler1Won = total1 > total2;
+    const bowler2Won = total2 > total1;
+    const tie = total1 === total2;
+    
+    matchups.set(bowler1.bowlerId, { 
+      opponentId: bowler2.bowlerId, 
+      won: bowler1Won, 
+      tied: tie,
+      pointsWon: bowler1Won ? 2 : (tie ? 1 : 0),
+      total: total1,
+      scores: scores1
+    });
+    matchups.set(bowler2.bowlerId, { 
+      opponentId: bowler1.bowlerId, 
+      won: bowler2Won, 
+      tied: tie,
+      pointsWon: bowler2Won ? 2 : (tie ? 1 : 0),
+      total: total2,
+      scores: scores2
+    });
+  }
+  
+  // Handle odd opponent (gets a bye - still bowls but auto-wins)
+  if (shuffledOpponents.length % 2 === 1) {
+    const byeBowler = shuffledOpponents[shuffledOpponents.length - 1];
+    const byeScores = [0, 0, 0].map(() => simulateOpponentLeagueGame(byeBowler.average || 150, league.oilPattern));
+    const byeTotal = byeScores.reduce((a, b) => a + b, 0);
+    matchups.set(byeBowler.bowlerId, { 
+      opponentId: 'bye', 
+      won: true, 
+      tied: false,
+      pointsWon: 2,
+      total: byeTotal,
+      scores: byeScores
+    });
+  }
+  
   const newStandings = league.standings.map(standing => {
     if (standing.isPlayer) {
       const newTotalPins = standing.totalPins + playerTotal;
@@ -215,24 +276,28 @@ export function simulateLeagueWeek(league: ActiveLeague, playerScores: number[])
       };
     }
     
-    const simGames = 3;
-    const simTotal = [0, 0, 0].map(() => 
-      simulateOpponentLeagueGame(standing.average || 150, league.oilPattern)
-    ).reduce((a, b) => a + b, 0);
-    const simWon = Math.random() > 0.5;
+    // Use simulated matchup results for this opponent
+    const matchResult = matchups.get(standing.bowlerId);
+    if (matchResult) {
+      const newTotalPins = standing.totalPins + matchResult.total;
+      const newGamesPlayed = standing.gamesPlayed + 3;
+      const highGameThisWeek = Math.max(...matchResult.scores);
+      
+      return {
+        ...standing,
+        totalPins: newTotalPins,
+        gamesPlayed: newGamesPlayed,
+        highGame: Math.max(standing.highGame, highGameThisWeek),
+        highSeries: Math.max(standing.highSeries, matchResult.total),
+        average: Math.round(newTotalPins / newGamesPlayed),
+        points: standing.points + matchResult.pointsWon,
+        wins: standing.wins + (matchResult.won ? 1 : 0),
+        losses: standing.losses + (matchResult.won || matchResult.tied ? 0 : 1),
+      };
+    }
     
-    const newTotalPins = standing.totalPins + simTotal;
-    const newGamesPlayed = standing.gamesPlayed + simGames;
-    
-    return {
-      ...standing,
-      totalPins: newTotalPins,
-      gamesPlayed: newGamesPlayed,
-      average: Math.round(newTotalPins / newGamesPlayed),
-      points: standing.points + (simWon ? 2 : 0),
-      wins: standing.wins + (simWon ? 1 : 0),
-      losses: standing.losses + (simWon ? 0 : 1),
-    };
+    // Fallback (shouldn't happen)
+    return standing;
   });
   
   newStandings.sort((a, b) => b.points - a.points || b.totalPins - a.totalPins);

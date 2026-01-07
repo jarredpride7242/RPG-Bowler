@@ -18,12 +18,25 @@ import {
   Calendar, 
   Briefcase, 
   ChevronRight,
+  ChevronDown,
   Zap,
   Trophy,
   Dumbbell,
   Star,
-  Building2
+  Building2,
+  Crosshair,
+  Gauge,
+  RotateCw,
+  Timer,
+  Shield,
+  Brain,
+  Eye,
+  Wrench,
+  Battery,
+  Smile,
+  LucideIcon
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGame } from "@/lib/gameContext";
 import { GAME_CONSTANTS, BOWLING_ALLEY_CONSTANTS } from "@shared/schema";
 import { WeeklyEventModal, ActiveEffectsPanel } from "@/components/WeeklyEventModal";
@@ -50,11 +63,25 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
     updateStats({ [stat]: currentValue + gain });
   };
   
-  const quickTrainingOptions = [
-    { stat: "accuracy" as const, label: "Accuracy", cost: 15, icon: Target },
-    { stat: "consistency" as const, label: "Consistency", cost: 15, icon: TrendingUp },
-    { stat: "throwPower" as const, label: "Power", cost: 20, icon: Dumbbell },
+  const [showAllTraining, setShowAllTraining] = useState(false);
+  
+  const allTrainingOptions: { stat: keyof typeof currentProfile.stats; label: string; cost: number; icon: LucideIcon }[] = [
+    { stat: "throwPower", label: "Power", cost: 15, icon: Dumbbell },
+    { stat: "accuracy", label: "Accuracy", cost: 15, icon: Target },
+    { stat: "hookControl", label: "Hook Control", cost: 15, icon: RotateCw },
+    { stat: "revRate", label: "Rev Rate", cost: 15, icon: Gauge },
+    { stat: "speedControl", label: "Speed Control", cost: 15, icon: Timer },
+    { stat: "consistency", label: "Consistency", cost: 15, icon: TrendingUp },
+    { stat: "spareShooting", label: "Spare Shooting", cost: 15, icon: Crosshair },
+    { stat: "mentalToughness", label: "Mental Toughness", cost: 20, icon: Shield },
+    { stat: "laneReading", label: "Lane Reading", cost: 20, icon: Eye },
+    { stat: "equipmentKnowledge", label: "Equipment Knowledge", cost: 15, icon: Wrench },
+    { stat: "stamina", label: "Stamina", cost: 20, icon: Battery },
+    { stat: "charisma", label: "Charisma", cost: 10, icon: Smile },
   ];
+  
+  const primaryTrainingOptions = allTrainingOptions.slice(0, 4);
+  const additionalTrainingOptions = allTrainingOptions.slice(4);
   
   const activeEventEffects = getActiveEventEffects();
   const partner = getCurrentPartner();
@@ -203,7 +230,7 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {quickTrainingOptions.map((option) => {
+          {primaryTrainingOptions.map((option) => {
             const Icon = option.icon;
             const canTrain = currentProfile.energy >= option.cost;
             
@@ -230,6 +257,44 @@ export function HomeScreen({ onNavigate }: HomeScreenProps) {
               </Button>
             );
           })}
+          
+          <Collapsible open={showAllTraining} onOpenChange={setShowAllTraining}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-center gap-2" data-testid="button-show-more-training">
+                {showAllTraining ? "Show Less" : "Show More Stats"}
+                <ChevronDown className={`w-4 h-4 transition-transform ${showAllTraining ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-2">
+              {additionalTrainingOptions.map((option) => {
+                const Icon = option.icon;
+                const canTrain = currentProfile.energy >= option.cost;
+                
+                return (
+                  <Button
+                    key={option.stat}
+                    variant="outline"
+                    className="w-full justify-between"
+                    disabled={!canTrain}
+                    onClick={() => handleTrain(option.stat, option.cost)}
+                    data-testid={`button-train-${option.stat}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="w-4 h-4" />
+                      {option.label}
+                      <Badge variant="secondary" className="text-xs">
+                        {currentProfile.stats[option.stat]}
+                      </Badge>
+                    </span>
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5" />
+                      {option.cost}
+                    </span>
+                  </Button>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
       
