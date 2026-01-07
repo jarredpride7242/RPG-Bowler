@@ -180,7 +180,10 @@ export function simulateLeagueWeek(league: ActiveLeague, playerScores: number[])
   const opponentTotal = opponentScores.reduce((a, b) => a + b, 0);
   
   const playerWon = playerTotal > opponentTotal;
-  const pointsEarned = playerWon ? 2 : (playerTotal === opponentTotal ? 1 : 0);
+  const opponentWon = opponentTotal > playerTotal;
+  const playerTied = playerTotal === opponentTotal;
+  const pointsEarned = playerWon ? 2 : (playerTied ? 1 : 0);
+  const opponentPointsEarned = opponentWon ? 2 : (playerTied ? 1 : 0);
   
   // Create matchups for all non-player opponents (excluding the one playing the player)
   const opponentsNotPlayingPlayer = nonPlayerStandings.filter(s => s.bowlerId !== opponent.bowlerId);
@@ -256,7 +259,7 @@ export function simulateLeagueWeek(league: ActiveLeague, playerScores: number[])
         average: Math.round(newTotalPins / newGamesPlayed),
         points: standing.points + pointsEarned,
         wins: standing.wins + (playerWon ? 1 : 0),
-        losses: standing.losses + (playerWon ? 0 : 1),
+        losses: standing.losses + (playerWon || playerTied ? 0 : 1),
       };
     }
     
@@ -270,9 +273,9 @@ export function simulateLeagueWeek(league: ActiveLeague, playerScores: number[])
         highGame: Math.max(standing.highGame, Math.max(...opponentScores)),
         highSeries: Math.max(standing.highSeries, opponentTotal),
         average: Math.round(newTotalPins / newGamesPlayed),
-        points: standing.points + (playerWon ? 0 : 2),
-        wins: standing.wins + (playerWon ? 0 : 1),
-        losses: standing.losses + (playerWon ? 1 : 0),
+        points: standing.points + opponentPointsEarned,
+        wins: standing.wins + (opponentWon ? 1 : 0),
+        losses: standing.losses + (opponentWon || playerTied ? 0 : 1),
       };
     }
     
