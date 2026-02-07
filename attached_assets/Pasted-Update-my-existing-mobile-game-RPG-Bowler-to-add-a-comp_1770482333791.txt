@@ -1,0 +1,204 @@
+Update my existing mobile game RPG Bowler to add a complete long-term progression system including: Career Ladder, Rankings, Sponsors, Seasonal Story Beats, and Prestige/New Game+. Keep the current game fully playable and do NOT break existing saves. Use safe defaults for any new fields.
+
+Hard requirements:
+	•	Keep 3 save slots and ensure old saves load with defaults
+	•	Keep the existing energy system and weekly reset logic
+	•	Keep go pro requirement: player must maintain 200+ average to apply for professional membership
+	•	Do not remove existing leagues/tournaments; extend them
+	•	All new systems must be visible in UI with clear progress indicators
+
+⸻
+
+1) Career Ladder System (New “Career” tab)
+
+Add a new tab: Career (rename/insert without breaking nav).
+The Career tab must show a tiered ladder with current tier, next tier requirements, and unlocked content.
+
+Career Tiers (example, adjust names if needed)
+	1.	Amateur (start)
+	2.	League Regular
+	3.	Regional Contender
+	4.	State Champion Track
+	5.	National Circuit
+	6.	Pro Applicant (requires 200+ avg)
+	7.	Professional
+	8.	Elite Tour
+
+Tier Requirements (use checklists)
+
+Requirements should combine:
+	•	minimum average (or “peak avg” + “current avg”)
+	•	number of league weeks completed
+	•	number of tournaments entered/won
+	•	ranking threshold (see rankings system)
+	•	optional “license exam” event (simple checklist confirmation pop-up, not a mini-game)
+
+Tier Unlocks
+
+Each tier unlocks at least one of:
+	•	new leagues/tournament categories
+	•	higher prize pools
+	•	new sponsor tiers
+	•	cosmetic title/badge
+	•	“Season Story Beat” chapters
+
+The Career tab should include:
+	•	a progress bar to next tier
+	•	a “Career badge” displayed in the top UI bar
+
+⸻
+
+2) Rankings System (New “Rankings” screen)
+
+Add a Rankings section accessible from Career tab or a new sub-tab.
+
+Rankings should include multiple leaderboards:
+	•	Local
+	•	Regional
+	•	State
+	•	National
+	•	Pro Tour (only after Professional status)
+
+Implementation
+	•	Generate a pool of AI bowlers (e.g., 100–300) with names, archetypes, and skill ranges that scale by region level.
+	•	Each “week” or “event”, simulate AI results and update rankings.
+	•	Player’s rank moves based on their performance in leagues/tournaments.
+	•	Show:
+	•	player current rank number (e.g., #42 Regional)
+	•	movement indicator (↑/↓ since last update)
+	•	top 10 list and “near you” list
+
+Rival System (lightweight but impactful)
+	•	Create 5–10 recurring rivals that appear often in events.
+	•	Show rivalry card: name, rival rank, last head-to-head outcome.
+	•	Occasionally trigger a “Rival Match” highlight in Seasonal Story Beats.
+
+⸻
+
+3) Sponsorship System (New “Sponsors” tab or section)
+
+Add a Sponsors system with offers that unlock based on Career tier + rankings.
+
+Sponsor Tiers
+	•	Local Sponsor (early)
+	•	Regional Sponsor
+	•	National Sponsor
+	•	Pro Sponsor
+
+Sponsor Contracts
+
+Each sponsor contract should define:
+	•	contract length in weeks
+	•	weekly stipend OR performance bonus
+	•	perks (examples: discount at ball shop, small energy boost, free entry fees, bonus XP)
+	•	requirements to maintain (e.g., average above X, finish top Y in events, keep ranking above threshold)
+
+Sponsor UI
+	•	“Available Offers” list with requirements + benefits clearly shown
+	•	“Active Sponsor” panel with:
+	•	weeks remaining
+	•	objectives progress
+	•	earned bonuses
+	•	“Sponsor Reputation” meter that improves when you meet objectives and worsens when you fail.
+
+Fail Conditions
+	•	If player repeatedly fails objectives, sponsor may terminate contract with a warning first.
+	•	Provide a fair grace system (1 warning week before termination).
+
+⸻
+
+4) Seasonal Story Beats (Post-season + In-season moments)
+
+Expand seasons to feel like a career narrative, without heavy writing.
+
+A) Season Structure
+
+Define a “Season” as:
+	•	League season length (existing or set default)
+	•	Key checkpoints:
+	•	Pre-season (after draft equivalent if you have it; otherwise after offseason)
+	•	Mid-season (Week 10)
+	•	Post-season (after championship / major tournament)
+
+B) Story Beat Pop-ups
+
+Add short, punchy “story beat” popups at:
+	•	start of season
+	•	week 10
+	•	end of season
+
+Story beats should reflect:
+	•	ranking progress
+	•	rival encounters
+	•	sponsor developments
+	•	career tier unlock moments
+	•	highlight achievements and setbacks
+
+Make beats dynamic using variables:
+	•	if player improved rank a lot → “breakout season” beat
+	•	if player had slump → “comeback arc” beat
+	•	if won major → “headline win” beat
+
+Include 2–3 player choices sometimes (low effort):
+	•	“Train harder” (cost energy, boost next event)
+	•	“Rest” (restore energy, small performance variance reduction)
+	•	“Media day” (improve sponsor reputation, costs energy)
+
+⸻
+
+5) Prestige / New Game+ (Legacy System)
+
+After the player reaches Professional (or completes first Pro season), unlock Prestige called:
+Legacy Reset (New Game+).
+
+Prestige Rules
+	•	Player may reset career progression back to Amateur/early tier
+	•	Keep Legacy Points earned from:
+	•	season awards (MVP etc.)
+	•	titles (league champ, national wins)
+	•	pro achievements
+	•	high average milestones
+
+Legacy Shop (Permanent Bonuses)
+
+Add “Legacy Shop” where points can buy permanent upgrades that carry into future runs, like:
+	•	+starting cash
+	•	+starting energy cap (or +weekly energy bonus)
+	•	+small bonus XP gain
+	•	unlock extra perk slot (if perks exist) OR small boost to a stat category
+	•	cheaper entry fees
+
+Ensure these are balanced and capped so the game doesn’t break.
+
+UI
+	•	Show Lifetime Stats:
+	•	total seasons played
+	•	total titles
+	•	highest average achieved
+	•	total Legacy Points earned/spent
+	•	Add a clear warning modal before resetting.
+
+⸻
+
+6) Integration Details (must not break existing game)
+	•	Add new state fields to the save schema:
+	•	careerTier, careerProgress, rankings, rivals, sponsor, sponsorReputation, legacyPoints, prestigeCount, seasonStoryFlags, lifetimeStats
+	•	Provide migrateSave() so old saves load without errors.
+	•	Ensure all screens are mobile-friendly and do not overwhelm the player: keep each tab clean and scrollable.
+	•	Add tuning constants at top for:
+	•	AI bowler count
+	•	ranking volatility
+	•	sponsor objective difficulty
+	•	legacy point earnings rate
+
+⸻
+
+Deliverable
+
+A working update where the player can:
+	•	view and progress through a Career Ladder
+	•	see rankings change week to week
+	•	accept and manage sponsorships
+	•	experience season story beats at checkpoints
+	•	unlock prestige/legacy reset and spend legacy points
+while keeping the game stable, readable, and fun.
