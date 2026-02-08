@@ -1,0 +1,150 @@
+You are my senior mobile engineer. I have a React + Vite + TypeScript game wrapped with Capacitor and an Android project generated (android/ folder). Your job is to fully integrate monetization for Android (Google Play) with:
+
+1) Rewarded Ads (AdMob) that grant rewards:
+   - Primary: +5 skill points for watching a rewarded ad
+   - Secondary option (configurable): +50 coins for watching a rewarded ad
+   Include cooldowns, daily caps, anti-spam checks, and safe UI states.
+
+2) In-App Purchases (Google Play Billing) including:
+   - “Remove Ads” one-time purchase priced at $4.99 (premium convenience positioning)
+   - Optional “Support Pack” one-time purchase priced at $2.99 that grants +500 coins
+   Purchases must be restorable and persist across reinstalls.
+
+3) A clean monetization/entitlement system:
+   - single source of truth for entitlements and balances
+   - persists state locally (localStorage/IndexedDB) and supports “Restore Purchases”
+   - if Remove Ads is owned: disable interstitial/banner ads entirely
+   - rewarded ads remain optional (player-initiated) even if Remove Ads is owned
+
+Constraints / Environment:
+- Frontend: React + TSX under /client, built with Vite.
+- Vite build output is currently to dist/public (or similar). Detect the real output path after build and ensure Capacitor uses the correct webDir.
+- Capacitor project already exists with android/ folder.
+- Do NOT break existing game UI or gameplay. Prefer refactors that only fix structure/import paths if needed.
+- Use AdMob TEST IDs and test purchase flow by default. Provide a clear “Switch to Production” section.
+
+Deliverables (create/modify real files with full code, not pseudocode):
+
+A) Core modules:
+- /client/src/monetization/monetizationStore.ts
+    State:
+      - hasRemoveAds: boolean
+      - coins: number
+      - skillPoints: number
+      - lastRewardAt: number (ms)
+      - rewardCountToday: number
+      - rewardDayStamp: string (YYYY-MM-DD)
+    Actions:
+      - canClaimReward(): { ok: boolean; reason?: string }
+      - markRewardClaimed()
+      - grantCoins(amount)
+      - grantSkillPoints(amount)
+      - setRemoveAdsOwned(true)
+      - loadFromStorage() / saveToStorage()
+      - restorePurchases()
+
+- /client/src/monetization/products.ts
+    - SKU constants and metadata:
+      - REMOVE_ADS_SKU = "remove_ads"
+      - SUPPORT_PACK_SMALL_SKU = "support_pack_small"
+    - Reward constants:
+      - REWARDED_SKILL_POINTS = 5
+      - REWARDED_COINS = 50
+    - Limits:
+      - REWARDED_COOLDOWN_MINUTES = 5
+      - REWARDED_DAILY_CAP = 10
+
+- /client/src/monetization/adService.ts
+    Using AdMob:
+      - initialize()
+      - showRewardedForSkillPoints() (grant only on reward callback success)
+      - showRewardedForCoins()
+      - OPTIONAL: showInterstitialBetweenSessions() (default OFF; only if !hasRemoveAds)
+    Must:
+      - handle ad load failures gracefully
+      - never grant reward on failure/cancel
+      - respect cooldown + daily cap from monetizationStore
+
+- /client/src/monetization/iapService.ts
+    Using Google Play Billing via a maintained approach:
+      - Prefer cordova-plugin-purchase (storekit/play billing) integrated with Capacitor OR a maintained Capacitor billing plugin.
+    Must:
+      - register products (remove_ads, support_pack_small)
+      - purchaseRemoveAds(): sets entitlement on approved transaction
+      - purchaseSupportPackSmall(): grants +500 coins on approved transaction
+      - restorePurchases(): restores remove_ads entitlement and prevents duplicate grants for consumables
+      - handle pending/cancelled/failed transactions properly
+    Important:
+      - “Remove Ads” is NON-CONSUMABLE (one-time)
+      - “Support Pack” can be CONSUMABLE or NON-CONSUMABLE. Choose the simplest correct approach and prevent duplicate grants.
+
+B) UI components:
+- /client/src/components/MonetizationModal.tsx
+    Include:
+      - “Watch Ad: Get +5 skill points” button
+      - “Watch Ad: Get +50 coins” optional secondary button (or toggle)
+      - “Remove Ads ($4.99)” purchase button
+      - “Support Pack ($2.99) – Get 500 coins” purchase button
+      - “Restore Purchases” button
+      - Clear text about cooldown/daily cap
+      - Show “Ads removed ✓” when hasRemoveAds
+
+- /client/src/components/RemoveAdsBanner.tsx
+    Small banner/component shown in Settings/Store:
+      - If !hasRemoveAds: highlight Remove Ads
+      - If hasRemoveAds: show confirmation state
+
+Integrate these into an existing screen (Settings/Store/Main Menu) with minimal disruption.
+
+C) Android + Capacitor configuration:
+- Install and configure AdMob plugin:
+  - Prefer @capacitor-community/admob
+- Configure AndroidManifest and strings.xml for AdMob App ID
+- Ensure permissions are correct (INTERNET, ACCESS_NETWORK_STATE)
+- Ensure capacitor.config.* uses correct webDir for build output (likely "dist/public")
+
+D) Anti-abuse + player-friendly rules:
+- Cooldown: 5 minutes between rewarded claims
+- Daily cap: 10 rewarded claims/day
+- Only grant reward when the rewarded callback confirms success
+- If user is offline or ad fails: show friendly message and no reward
+- Log/track reward claims to prevent repeated tapping exploits
+- Rewarded ads are always opt-in (player taps button)
+
+E) Testing checklist + production switch:
+- Provide commands:
+  - npm install
+  - npm run build
+  - npx cap sync android
+  - npx cap open android
+- Explain exactly how to:
+  - use AdMob TEST IDs while developing (do not use production ads during testing)
+  - set up Play Console license testers and Internal Testing track for billing tests
+  - create products in Play Console matching SKUs:
+      remove_ads
+      support_pack_small
+  - switch to production AdMob App ID / Ad Unit IDs safely
+
+F) Git hygiene:
+- Ensure .gitignore contains node_modules/, dist/, local/, *.keystore
+- Do not commit any keystore or secrets
+- Commit android/ project and capacitor config changes
+
+Implementation Steps (do in order):
+1) Inspect current build output directory (verify where index.html ends up after build). Fix Vite/Capacitor alignment so Capacitor webDir points at the actual output (ex: dist/public).
+2) Add dependencies for ads + billing, then run `npx cap sync android`.
+3) Implement the monetization store and persistence first.
+4) Implement AdMob rewarded ads and connect rewards to the store with cooldown/cap enforcement.
+5) Implement IAP (Remove Ads $4.99, Support Pack $2.99).
+6) Add the Monetization modal and wire it into the game.
+7) Add a simple “Monetization Setup (Android)” section in README with exact console steps for AdMob + Play Console.
+8) Run build + sync and confirm no runtime errors.
+
+Rules:
+- Do NOT delete game features.
+- Prefer fixing paths over rewriting screens.
+- Keep code typed, clean, and minimal.
+- If any IDs are required, create clearly-labeled placeholders and put them in one config file.
+- At the end, summarize what you changed and the exact next steps I must do in AdMob + Play Console to go live.
+
+Now implement everything.

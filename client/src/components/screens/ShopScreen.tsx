@@ -44,6 +44,8 @@ import type { BowlingBall, Job, Property, PurchaseId, BallRarity } from "@shared
 import { IAP_PRODUCTS, GAME_CONSTANTS } from "@shared/schema";
 import { BallVisual } from "@/components/BallVisual";
 import { BallDetailModal } from "@/components/BallDetailModal";
+import { MonetizationModal } from "@/components/MonetizationModal";
+import { RemoveAdsBanner } from "@/components/RemoveAdsBanner";
 import { 
   generateShopInventory, 
   getFeaturedBalls, 
@@ -161,6 +163,7 @@ export function ShopScreen() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [rarityFilter, setRarityFilter] = useState<string>("all");
   const [sortOption, setSortOption] = useState<SortOption>("price-low");
+  const [showMonetization, setShowMonetization] = useState(false);
   
   if (!currentProfile) return null;
   
@@ -621,6 +624,18 @@ export function ShopScreen() {
         </TabsContent>
         
         <TabsContent value="premium" className="space-y-4 mt-4">
+          <RemoveAdsBanner onOpenStore={() => setShowMonetization(true)} />
+          
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowMonetization(true)}
+            data-testid="button-open-rewards-store"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Rewards & Ad Store
+          </Button>
+
           <Card className="border-primary/30 bg-primary/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -832,6 +847,11 @@ export function ShopScreen() {
         }}
         isOwned={detailBall ? ownedBallIds.includes(detailBall.id) : false}
         canAfford={detailBall ? currentProfile.money >= detailBall.price : false}
+      />
+      
+      <MonetizationModal
+        open={showMonetization}
+        onOpenChange={setShowMonetization}
       />
     </div>
   );

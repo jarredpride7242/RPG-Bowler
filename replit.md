@@ -145,14 +145,29 @@ Preferred communication style: Simple, everyday language.
 - **esbuild**: Server bundling for production
 - **TypeScript**: Full type coverage across client, server, and shared code
 
+### Monetization System
+- **AdMob**: `@capacitor-community/admob@7.2.0` for rewarded and interstitial ads
+  - Rewarded ads grant +5 skill points or +50 coins
+  - Anti-abuse: 5-minute cooldown, 10 ads/day cap
+  - Test/production mode via `ADMOB_CONFIG.useTestIds` in `products.ts`
+- **IAP**: Structured for Google Play Billing with graceful fallback
+  - Remove Ads ($4.99, non-consumable) - `remove_ads` SKU
+  - Support Pack ($2.99, consumable, grants 500 coins) - `support_pack_small` SKU
+  - Auto-detects billing plugins at runtime; simulates purchases on web
+  - Restore flow checks Play Store first, falls back to localStorage
+- **Files**: `client/src/monetization/` - products.ts, monetizationStore.ts, adService.ts, iapService.ts
+- **UI**: MonetizationModal.tsx, RemoveAdsBanner.tsx integrated into ShopScreen Store tab
+
 ### Mobile Packaging (Capacitor)
 - **@capacitor/core**: Capacitor runtime for native mobile apps
 - **@capacitor/cli**: Capacitor CLI tooling
 - **@capacitor/android**: Android platform support
+- **Plugins**: AdMob, App, Haptics, Keyboard, SplashScreen, StatusBar (6 total)
 - **Config**: `capacitor.config.ts` - App ID: `com.jarredpride.rpgbowler`, App Name: `RPG Bowler`
 - **Static Build**: `vite.config.capacitor.ts` builds frontend-only to `dist/capacitor/` (no server dependencies)
 - **Android Project**: `android/` directory contains the native Android project
 - **Build Flow**: `npx vite build --config vite.config.capacitor.ts` → `npx cap sync android` → Open in Android Studio
+- **AdMob Setup**: Test App ID in `android/app/src/main/res/values/strings.xml`; replace with production ID before release
 
 ### Replit-Specific
 - **@replit/vite-plugin-runtime-error-modal**: Error overlay in development
