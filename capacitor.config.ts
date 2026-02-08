@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.jarredpride.rpgbowler',
   appName: 'RPG Bowler',
-  webDir: 'dist/capacitor',
+  webDir: 'dist/public',
   server: {
     androidScheme: 'https',
   },
