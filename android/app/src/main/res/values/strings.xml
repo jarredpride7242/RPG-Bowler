@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RPG Bowler</string>
+    <string name="title_activity_main">RPG Bowler</string>
+    <string name="package_name">com.jarredpride.rpgbowler</string>
+    <string name="custom_url_scheme">com.jarredpride.rpgbowler</string>
+</resources>

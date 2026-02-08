@@ -145,6 +145,15 @@ Preferred communication style: Simple, everyday language.
 - **esbuild**: Server bundling for production
 - **TypeScript**: Full type coverage across client, server, and shared code
 
+### Mobile Packaging (Capacitor)
+- **@capacitor/core**: Capacitor runtime for native mobile apps
+- **@capacitor/cli**: Capacitor CLI tooling
+- **@capacitor/android**: Android platform support
+- **Config**: `capacitor.config.ts` - App ID: `com.jarredpride.rpgbowler`, App Name: `RPG Bowler`
+- **Static Build**: `vite.config.capacitor.ts` builds frontend-only to `dist/capacitor/` (no server dependencies)
+- **Android Project**: `android/` directory contains the native Android project
+- **Build Flow**: `npx vite build --config vite.config.capacitor.ts` → `npx cap sync android` → Open in Android Studio
+
 ### Replit-Specific
 - **@replit/vite-plugin-runtime-error-modal**: Error overlay in development
 - **@replit/vite-plugin-cartographer**: Development tooling
