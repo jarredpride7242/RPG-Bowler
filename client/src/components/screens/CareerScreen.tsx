@@ -33,6 +33,9 @@ import { LeaguePlayMatch } from "@/components/LeaguePlayMatch";
 import { TournamentPlayMatch } from "@/components/TournamentPlayMatch";
 import { simulateOpponentGame } from "@/lib/gameUtils";
 import { CompetitionsHub } from "@/components/CompetitionsHub";
+import { CareerLadderPanel } from "@/components/CareerLadderPanel";
+import { RankingsPanel } from "@/components/RankingsPanel";
+import { StoryBeatModal } from "@/components/StoryBeatModal";
 
 const AVAILABLE_COMPETITIONS: Competition[] = [
   {
@@ -115,7 +118,7 @@ const AVAILABLE_COMPETITIONS: Competition[] = [
 ];
 
 export function CareerScreen() {
-  const { currentProfile, goProfessional, spendMoney, useEnergy, addMoney, addGameResult, updateProfile } = useGame();
+  const { currentProfile, goProfessional, spendMoney, useEnergy, addMoney, addGameResult, updateProfile, trackLeagueWeekCompleted, trackTournamentEntered, trackTournamentWon } = useGame();
   const [showProDialog, setShowProDialog] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<Competition | null>(null);
   const [competitionResult, setCompetitionResult] = useState<{ score: number; placement: number; prize: number } | null>(null);
@@ -157,6 +160,10 @@ export function CareerScreen() {
     if (!canEnterCompetition(comp)) return;
     if (!spendMoney(comp.entryFee)) return;
     if (!useEnergy(comp.energyCost)) return;
+    
+    if (comp.type === "tournament" || comp.type === "championship") {
+      trackTournamentEntered();
+    }
     
     setSelectedCompetition(comp);
     setShowEventLobby(true);
@@ -371,14 +378,17 @@ export function CareerScreen() {
 
   const handleLeagueComplete = (updatedLeague: ActiveLeague) => {
     updateProfile({ activeLeague: updatedLeague });
+    trackLeagueWeekCompleted();
     setPlayingLeagueWeek(false);
   };
 
   const handleTournamentComplete = (updatedTournament: ActiveTournament | null, result?: any) => {
     if (result) {
-      // Tournament fully complete with result
       if (result.prizeMoney > 0) {
         addMoney(result.prizeMoney);
+      }
+      if (result.placement === 1) {
+        trackTournamentWon();
       }
       const history = currentProfile.tournamentHistory || [];
       updateProfile({ 
@@ -520,17 +530,29 @@ export function CareerScreen() {
         </Card>
       )}
       
-      <Tabs defaultValue="competitions" className="w-full">
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="competitions">Competitions</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+      <StoryBeatModal />
+
+      <Tabs defaultValue="ladder" className="w-full">
+        <TabsList className="w-full grid grid-cols-4">
+          <TabsTrigger value="ladder" data-testid="tab-ladder">Ladder</TabsTrigger>
+          <TabsTrigger value="competitions" data-testid="tab-competitions">Compete</TabsTrigger>
+          <TabsTrigger value="rankings" data-testid="tab-rankings">Rankings</TabsTrigger>
+          <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
         </TabsList>
         
+        <TabsContent value="ladder" className="space-y-4 mt-4">
+          <CareerLadderPanel />
+        </TabsContent>
+
         <TabsContent value="competitions" className="space-y-4 mt-4">
           <CompetitionsHub 
             onPlayLeagueGame={handlePlayLeagueWeek}
             onPlayTournamentGame={handlePlayTournamentGame}
           />
+        </TabsContent>
+
+        <TabsContent value="rankings" className="space-y-4 mt-4">
+          <RankingsPanel />
         </TabsContent>
         
         <TabsContent value="history" className="space-y-4 mt-4">

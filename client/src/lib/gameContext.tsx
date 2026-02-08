@@ -41,7 +41,15 @@ import type {
   DatingMatch,
   ActiveDatingProfile,
   ChatMessage,
-  DatingStatus
+  DatingStatus,
+  CareerLadder,
+  CareerTier,
+  RankingsSnapshot,
+  RankedBowler,
+  PlayerRanking,
+  Rival,
+  StoryBeat,
+  StoryBeatChoice,
 } from "@shared/schema";
 import { 
   GAME_CONSTANTS, 
@@ -59,7 +67,10 @@ import {
   DATING_INTERESTS,
   DATING_COMPATIBILITY_TAGS,
   DATING_CHAT_TEMPLATES,
-  BOWLING_ALLEY_CONSTANTS
+  BOWLING_ALLEY_CONSTANTS,
+  CAREER_TIERS,
+  CAREER_TIER_ORDER,
+  RANKINGS_CONSTANTS,
 } from "@shared/schema";
 
 const STORAGE_KEY = "strike-force-game-state";
@@ -167,7 +178,6 @@ function migrateBowlingBall(ball: BowlingBall): BowlingBall {
 
 function migratePlayerProfile(profile: PlayerProfile): PlayerProfile {
   const migratedBalls = profile.ownedBalls.map(migrateBowlingBall);
-  const ballsNeedUpdate = profile.ownedBalls.some((b, i) => b !== migratedBalls[i]);
   
   const migratedProfile: PlayerProfile = {
     ...profile,
@@ -176,6 +186,14 @@ function migratePlayerProfile(profile: PlayerProfile): PlayerProfile {
     activeTournament: profile.activeTournament ?? null,
     tournamentHistory: profile.tournamentHistory ?? [],
     leagueChampionships: profile.leagueChampionships ?? 0,
+    careerLadder: profile.careerLadder ?? getDefaultCareerLadder(),
+    rankingsSnapshot: profile.rankingsSnapshot ?? generateRankingsPool(
+      Date.now() % 100000, 
+      profile.bowlingAverage || 120, 
+      profile.isProfessional || false
+    ),
+    pendingStoryBeat: profile.pendingStoryBeat ?? null,
+    storyBeatHistory: profile.storyBeatHistory ?? [],
   };
   
   return migratedProfile;
@@ -271,6 +289,250 @@ function getDefaultDatingState(): DatingSystemState {
     currentPartnerId: null,
     relationshipHistory: [],
     lastMatchRefreshWeek: 0,
+  };
+}
+
+function getDefaultCareerLadder(): CareerLadder {
+  return {
+    currentTier: "amateur",
+    highestTierReached: "amateur",
+    tierUnlockedWeek: {},
+    leagueWeeksCompleted: 0,
+    tournamentsEntered: 0,
+    tournamentsWon: 0,
+    peakAverage: 0,
+  };
+}
+
+const RIVAL_ARCHETYPES = [
+  "Power Player", "Finesse Artist", "Spare Machine", "Clutch Performer",
+  "Streaky Scorer", "Consistent Grinder", "Hook Master", "Speed Demon",
+];
+
+const RIVAL_NAMES = [
+  "Marcus Stone", "Derek Hawk", "Tyler Voss", "Jake Ironwood",
+  "Brandon Slate", "Connor Nash", "Ryan Forge", "Caleb Storm",
+];
+
+function seededRng(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+function generateRankingsPool(seed: number, playerAvg: number, isPro: boolean): RankingsSnapshot {
+  const rng = seededRng(seed);
+  const poolSize = RANKINGS_CONSTANTS.AI_POOL_SIZE;
+
+  const regions: Array<"local" | "regional" | "state" | "national" | "pro-tour"> = isPro
+    ? ["local", "regional", "state", "national", "pro-tour"]
+    : ["local", "regional", "state", "national"];
+
+  const topBowlers: Record<string, RankedBowler[]> = {};
+  const playerRankings: PlayerRanking[] = [];
+
+  for (const region of regions) {
+    const regionPool: RankedBowler[] = [];
+    const regionSize = region === "local" ? 30 : region === "regional" ? 50 : region === "state" ? 80 : region === "national" ? poolSize : 60;
+
+    const avgBase = region === "local" ? 140 : region === "regional" ? 165 : region === "state" ? 185 : region === "national" ? 200 : 215;
+    const avgSpread = region === "local" ? 40 : region === "regional" ? 35 : region === "state" ? 30 : region === "national" ? 25 : 20;
+
+    for (let i = 0; i < regionSize; i++) {
+      const avg = Math.round(avgBase + (rng() - 0.4) * avgSpread);
+      regionPool.push({
+        id: `ai-${region}-${i}`,
+        name: `${RIVAL_NAMES[Math.floor(rng() * RIVAL_NAMES.length)].split(" ")[0]} ${["Smith", "Jones", "Brown", "Wilson", "Taylor", "Davis", "Clark", "Hall", "Lee", "King"][Math.floor(rng() * 10)]}`,
+        average: Math.max(100, Math.min(280, avg)),
+        rank: 0,
+        previousRank: 0,
+        region,
+      });
+    }
+
+    regionPool.sort((a, b) => b.average - a.average);
+    regionPool.forEach((b, i) => {
+      b.rank = i + 1;
+      b.previousRank = i + 1;
+    });
+
+    let playerRank = regionPool.filter(b => b.average >= playerAvg).length + 1;
+    playerRank = Math.min(playerRank, regionPool.length + 1);
+
+    playerRankings.push({
+      rank: playerRank,
+      previousRank: playerRank,
+      region,
+      ratingPoints: Math.round(playerAvg * 10 + (regionPool.length - playerRank) * 2),
+    });
+
+    topBowlers[region] = regionPool.slice(0, RANKINGS_CONSTANTS.LEADERBOARD_DISPLAY_SIZE);
+  }
+
+  const rivals: Rival[] = RIVAL_NAMES.slice(0, RANKINGS_CONSTANTS.RIVAL_COUNT).map((name, i) => {
+    const baseAvg = Math.max(120, playerAvg - 20 + Math.round(rng() * 40));
+    return {
+      id: `rival-${i}`,
+      name,
+      average: baseAvg,
+      archetype: RIVAL_ARCHETYPES[i % RIVAL_ARCHETYPES.length],
+      rank: Math.floor(rng() * 30) + 1,
+      headToHead: { wins: 0, losses: 0, lastResult: "none" as const },
+    };
+  });
+
+  return {
+    playerRankings,
+    topBowlers,
+    rivals,
+    lastUpdatedWeek: 0,
+    poolSeed: seed,
+  };
+}
+
+function updateRankingsWeekly(snapshot: RankingsSnapshot, playerAvg: number, recentPerformance: number, isPro: boolean): RankingsSnapshot {
+  const rng = seededRng(snapshot.poolSeed + snapshot.lastUpdatedWeek + 1);
+  const volatility = RANKINGS_CONSTANTS.RANKING_VOLATILITY;
+
+  const updatedTopBowlers: Record<string, RankedBowler[]> = {};
+  const updatedPlayerRankings: PlayerRanking[] = [];
+
+  for (const pr of snapshot.playerRankings) {
+    if (pr.region === "pro-tour" && !isPro) continue;
+
+    const regionBowlers = snapshot.topBowlers[pr.region] || [];
+    const updatedBowlers = regionBowlers.map(b => {
+      const avgShift = (rng() - 0.5) * volatility * 20;
+      return {
+        ...b,
+        previousRank: b.rank,
+        average: Math.max(100, Math.min(280, Math.round(b.average + avgShift))),
+      };
+    });
+
+    updatedBowlers.sort((a, b) => b.average - a.average);
+    updatedBowlers.forEach((b, i) => { b.rank = i + 1; });
+
+    const performanceBonus = (recentPerformance - playerAvg) * 0.3;
+    const newRating = pr.ratingPoints + Math.round(performanceBonus + (rng() - 0.5) * 5);
+
+    let newRank = updatedBowlers.filter(b => b.average >= playerAvg).length + 1;
+    const rankShift = performanceBonus > 0 ? -Math.ceil(performanceBonus / 3) : Math.ceil(Math.abs(performanceBonus) / 5);
+    newRank = Math.max(1, pr.rank + rankShift + Math.round((rng() - 0.5) * 3));
+
+    updatedPlayerRankings.push({
+      ...pr,
+      previousRank: pr.rank,
+      rank: newRank,
+      ratingPoints: Math.max(0, newRating),
+    });
+
+    updatedTopBowlers[pr.region] = updatedBowlers;
+  }
+
+  const updatedRivals = snapshot.rivals.map(r => {
+    const avgShift = (rng() - 0.5) * 8;
+    return {
+      ...r,
+      average: Math.max(100, Math.min(280, Math.round(r.average + avgShift))),
+      rank: Math.max(1, r.rank + Math.round((rng() - 0.5) * 4)),
+    };
+  });
+
+  return {
+    ...snapshot,
+    playerRankings: updatedPlayerRankings,
+    topBowlers: updatedTopBowlers,
+    rivals: updatedRivals,
+    lastUpdatedWeek: snapshot.lastUpdatedWeek + 1,
+    poolSeed: snapshot.poolSeed + 1,
+  };
+}
+
+function computeCareerTier(profile: PlayerProfile): CareerTier {
+  const ladder = profile.careerLadder ?? getDefaultCareerLadder();
+  const avg = profile.bowlingAverage;
+  const careerStats = profile.careerStats ?? getDefaultCareerStats();
+
+  let bestTier: CareerTier = "amateur";
+
+  for (const tier of CAREER_TIERS) {
+    const reqs = tier.requirements;
+    if (avg < reqs.minAverage) continue;
+    if (ladder.leagueWeeksCompleted < reqs.leagueWeeksCompleted) continue;
+    if (ladder.tournamentsEntered < reqs.tournamentsEntered) continue;
+    if ((careerStats.tournamentWins ?? 0) < reqs.tournamentsWon) continue;
+    if (reqs.requiresPro && !profile.isProfessional) continue;
+    bestTier = tier.id;
+  }
+
+  return bestTier;
+}
+
+function generateStoryBeat(profile: PlayerProfile, type: "pre-season" | "mid-season" | "post-season"): StoryBeat | null {
+  const ladder = profile.careerLadder ?? getDefaultCareerLadder();
+  const rankings = profile.rankingsSnapshot;
+  const localRank = rankings?.playerRankings.find(r => r.region === "local");
+
+  let title = "";
+  let description = "";
+  let beatType = type as StoryBeat["type"];
+  const choices: StoryBeatChoice[] = [];
+
+  if (type === "pre-season") {
+    title = `Season ${profile.currentSeason} Begins`;
+    const tierDef = CAREER_TIERS.find(t => t.id === ladder.currentTier);
+    description = `A new season dawns. You're currently ranked as a ${tierDef?.name ?? "Amateur"}${localRank ? ` (#${localRank.rank} locally)` : ""}. Time to set your goals and hit the lanes.`;
+    choices.push(
+      { id: "train-hard", label: "Train Hard", description: "Start the season with an intense training session", effect: { energy: -20, statBoost: "accuracy", statAmount: 2 } },
+      { id: "rest-up", label: "Rest Up", description: "Save energy for the competitions ahead", effect: { energy: 15 } },
+      { id: "media-day", label: "Media Day", description: "Build your reputation with a media appearance", effect: { energy: -10, sponsorRep: 5 } },
+    );
+  } else if (type === "mid-season") {
+    const rankChange = localRank ? localRank.previousRank - localRank.rank : 0;
+    if (rankChange > 5) {
+      beatType = "breakout";
+      title = "Breakout Season!";
+      description = `You've been on fire! Climbing ${rankChange} spots in the rankings. The bowling world is taking notice of your meteoric rise.`;
+    } else if (rankChange < -5) {
+      beatType = "comeback";
+      title = "Time for a Comeback";
+      description = `It's been a tough stretch. You've dropped ${Math.abs(rankChange)} spots. But every champion faces adversity. How will you respond?`;
+    } else {
+      title = "Mid-Season Check-in";
+      description = `Season ${profile.currentSeason} is at the halfway mark. Your average is ${profile.bowlingAverage} and you're holding steady.`;
+    }
+    choices.push(
+      { id: "double-down", label: "Double Down", description: "Push harder in training", effect: { energy: -25, statBoost: "mentalToughness", statAmount: 3 } },
+      { id: "stay-course", label: "Stay the Course", description: "Keep doing what works", effect: { energy: 5 } },
+    );
+  } else {
+    const careerStats = profile.careerStats ?? getDefaultCareerStats();
+    if (careerStats.tournamentWins > 0 && profile.currentSeason > 1) {
+      beatType = "headline-win";
+      title = "Season Wrap: Champion!";
+      description = `What a season! ${careerStats.tournamentWins} tournament win(s) and a ${profile.bowlingAverage} average. You've cemented yourself as a force to be reckoned with.`;
+    } else {
+      title = `Season ${profile.currentSeason} Complete`;
+      description = `Another season in the books. Average: ${profile.bowlingAverage}. Games played: ${profile.totalGamesPlayed}. The offseason awaits.`;
+    }
+    choices.push(
+      { id: "offseason-train", label: "Offseason Training", description: "Hit the practice lanes during the break", effect: { energy: -15, statBoost: "consistency", statAmount: 2 } },
+      { id: "vacation", label: "Take a Vacation", description: "Rest and come back refreshed", effect: { energy: 30, money: -200 } },
+    );
+  }
+
+  return {
+    id: `story-${type}-s${profile.currentSeason}-w${profile.currentWeek}`,
+    type: beatType,
+    title,
+    description,
+    choices: choices.length > 0 ? choices : undefined,
+    weekTriggered: profile.currentWeek,
+    seasonTriggered: profile.currentSeason,
+    resolved: false,
   };
 }
 
@@ -408,6 +670,19 @@ interface GameContextType {
   purchaseBowlingAlley: (name: string) => boolean;
   upgradeBowlingAlley: () => boolean;
   canPurchaseBowlingAlley: () => boolean;
+  
+  // Career Ladder & Rankings
+  getCareerLadder: () => CareerLadder;
+  getRankingsSnapshot: () => RankingsSnapshot | null;
+  getCareerTier: () => CareerTier;
+  trackLeagueWeekCompleted: () => void;
+  trackTournamentEntered: () => void;
+  trackTournamentWon: () => void;
+  
+  // Story Beats
+  getPendingStoryBeat: () => StoryBeat | null;
+  resolveStoryBeat: (choiceId: string) => void;
+  dismissStoryBeat: () => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -773,6 +1048,52 @@ export function GameProvider({ children }: { children: ReactNode }) {
     // Clamp energy to minimum 0
     newEnergy = Math.max(0, newEnergy);
     
+    // 12. Career Ladder - update progress and check tier advancement
+    let newCareerLadder = { ...(currentProfile.careerLadder ?? getDefaultCareerLadder()) };
+    newCareerLadder.peakAverage = Math.max(newCareerLadder.peakAverage, currentProfile.bowlingAverage);
+    const tempProfileForTier = { ...currentProfile, careerLadder: newCareerLadder };
+    const newTier = computeCareerTier(tempProfileForTier);
+    if (CAREER_TIER_ORDER.indexOf(newTier) > CAREER_TIER_ORDER.indexOf(newCareerLadder.currentTier)) {
+      newCareerLadder.currentTier = newTier;
+      if (CAREER_TIER_ORDER.indexOf(newTier) > CAREER_TIER_ORDER.indexOf(newCareerLadder.highestTierReached)) {
+        newCareerLadder.highestTierReached = newTier;
+        newCareerLadder.tierUnlockedWeek = {
+          ...(newCareerLadder.tierUnlockedWeek ?? {}),
+          [newTier]: newWeek,
+        };
+      }
+    }
+    
+    // 13. Rankings - update weekly
+    const recentPerf = currentProfile.recentGameScores.length > 0
+      ? currentProfile.recentGameScores[currentProfile.recentGameScores.length - 1]
+      : currentProfile.bowlingAverage;
+    let newRankingsSnapshot = currentProfile.rankingsSnapshot 
+      ?? generateRankingsPool(Date.now() % 100000, currentProfile.bowlingAverage, currentProfile.isProfessional);
+    newRankingsSnapshot = updateRankingsWeekly(
+      newRankingsSnapshot,
+      currentProfile.bowlingAverage,
+      recentPerf,
+      currentProfile.isProfessional
+    );
+    
+    // 14. Seasonal Story Beats - trigger at checkpoints
+    let newPendingStoryBeat = currentProfile.pendingStoryBeat;
+    let newStoryBeatHistory = [...(currentProfile.storyBeatHistory ?? [])];
+    if (!newPendingStoryBeat || newPendingStoryBeat.resolved) {
+      const isNewSeason = newSeason !== currentProfile.currentSeason;
+      const isMidSeason = newWeek === 10;
+      const isEndSeason = newWeek === 52;
+      
+      if (isNewSeason) {
+        newPendingStoryBeat = generateStoryBeat({ ...currentProfile, currentWeek: newWeek, currentSeason: newSeason, rankingsSnapshot: newRankingsSnapshot }, "pre-season");
+      } else if (isMidSeason) {
+        newPendingStoryBeat = generateStoryBeat({ ...currentProfile, currentWeek: newWeek, rankingsSnapshot: newRankingsSnapshot }, "mid-season");
+      } else if (isEndSeason) {
+        newPendingStoryBeat = generateStoryBeat({ ...currentProfile, currentWeek: newWeek, rankingsSnapshot: newRankingsSnapshot }, "post-season");
+      }
+    }
+    
     updateProfile({
       currentWeek: newWeek,
       currentSeason: newSeason,
@@ -788,6 +1109,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       pendingEvent: newPendingEvent,
       datingState: newDatingState,
       ownedBowlingAlley: newOwnedBowlingAlley,
+      careerLadder: newCareerLadder,
+      rankingsSnapshot: newRankingsSnapshot,
+      pendingStoryBeat: newPendingStoryBeat,
+      storyBeatHistory: newStoryBeatHistory,
     });
   }, [currentProfile, updateProfile]);
 
@@ -1947,6 +2272,100 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return true;
   }, [currentProfile, updateProfile]);
 
+  const getCareerLadder = useCallback((): CareerLadder => {
+    return currentProfile?.careerLadder ?? getDefaultCareerLadder();
+  }, [currentProfile]);
+
+  const getRankingsSnapshot = useCallback((): RankingsSnapshot | null => {
+    return currentProfile?.rankingsSnapshot ?? null;
+  }, [currentProfile]);
+
+  const getCareerTier = useCallback((): CareerTier => {
+    if (!currentProfile) return "amateur";
+    return computeCareerTier(currentProfile);
+  }, [currentProfile]);
+
+  const trackLeagueWeekCompleted = useCallback(() => {
+    if (!currentProfile) return;
+    const ladder = currentProfile.careerLadder ?? getDefaultCareerLadder();
+    updateProfile({
+      careerLadder: {
+        ...ladder,
+        leagueWeeksCompleted: ladder.leagueWeeksCompleted + 1,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const trackTournamentEntered = useCallback(() => {
+    if (!currentProfile) return;
+    const ladder = currentProfile.careerLadder ?? getDefaultCareerLadder();
+    updateProfile({
+      careerLadder: {
+        ...ladder,
+        tournamentsEntered: ladder.tournamentsEntered + 1,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const trackTournamentWon = useCallback(() => {
+    if (!currentProfile) return;
+    const ladder = currentProfile.careerLadder ?? getDefaultCareerLadder();
+    updateProfile({
+      careerLadder: {
+        ...ladder,
+        tournamentsWon: ladder.tournamentsWon + 1,
+      },
+    });
+  }, [currentProfile, updateProfile]);
+
+  const getPendingStoryBeat = useCallback((): StoryBeat | null => {
+    return currentProfile?.pendingStoryBeat ?? null;
+  }, [currentProfile]);
+
+  const resolveStoryBeat = useCallback((choiceId: string) => {
+    if (!currentProfile?.pendingStoryBeat) return;
+    
+    const beat = currentProfile.pendingStoryBeat;
+    const choice = beat.choices?.find(c => c.id === choiceId);
+    if (!choice) return;
+    
+    const updates: Partial<PlayerProfile> = {};
+    let newEnergy = currentProfile.energy;
+    let newMoney = currentProfile.money;
+    const newStats = { ...currentProfile.stats };
+    
+    if (choice.effect.energy) newEnergy = Math.max(0, Math.min(currentProfile.maxEnergy ?? GAME_CONSTANTS.MAX_ENERGY, newEnergy + choice.effect.energy));
+    if (choice.effect.money) newMoney += choice.effect.money;
+    if (choice.effect.statBoost && choice.effect.statAmount) {
+      const stat = choice.effect.statBoost as keyof PlayerStats;
+      if (stat in newStats && typeof newStats[stat] === "number") {
+        (newStats as any)[stat] = Math.min(GAME_CONSTANTS.STAT_MAX, (newStats[stat] as number) + choice.effect.statAmount);
+      }
+    }
+    
+    const resolvedBeat = { ...beat, resolved: true };
+    const history = [...(currentProfile.storyBeatHistory ?? []), resolvedBeat];
+    
+    updateProfile({
+      ...updates,
+      energy: newEnergy,
+      money: newMoney,
+      stats: newStats,
+      pendingStoryBeat: resolvedBeat,
+      storyBeatHistory: history,
+    });
+  }, [currentProfile, updateProfile]);
+
+  const dismissStoryBeat = useCallback(() => {
+    if (!currentProfile?.pendingStoryBeat) return;
+    const resolvedBeat = { ...currentProfile.pendingStoryBeat, resolved: true };
+    const history = [...(currentProfile.storyBeatHistory ?? []), resolvedBeat];
+    updateProfile({
+      pendingStoryBeat: resolvedBeat,
+      storyBeatHistory: history,
+    });
+  }, [currentProfile, updateProfile]);
+
   return (
     <GameContext.Provider value={{
       gameState,
@@ -2030,6 +2449,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
       purchaseBowlingAlley,
       upgradeBowlingAlley,
       canPurchaseBowlingAlley,
+      // Career Ladder & Rankings
+      getCareerLadder,
+      getRankingsSnapshot,
+      getCareerTier,
+      trackLeagueWeekCompleted,
+      trackTournamentEntered,
+      trackTournamentWon,
+      // Story Beats
+      getPendingStoryBeat,
+      resolveStoryBeat,
+      dismissStoryBeat,
     }}>
       {children}
     </GameContext.Provider>

@@ -1745,6 +1745,232 @@ export const ownedBowlingAlleySchema = z.object({
 export type OwnedBowlingAlley = z.infer<typeof ownedBowlingAlleySchema>;
 
 // ============================================
+// CAREER LADDER SYSTEM
+// ============================================
+export const CAREER_TIER_ORDER = [
+  "amateur",
+  "league-regular",
+  "regional-contender",
+  "state-champion",
+  "national-circuit",
+  "pro-applicant",
+  "professional",
+  "elite-tour",
+] as const;
+
+export const careerTierSchema = z.enum([
+  "amateur",
+  "league-regular",
+  "regional-contender",
+  "state-champion",
+  "national-circuit",
+  "pro-applicant",
+  "professional",
+  "elite-tour",
+]);
+export type CareerTier = z.infer<typeof careerTierSchema>;
+
+export interface CareerTierDefinition {
+  id: CareerTier;
+  name: string;
+  description: string;
+  requirements: {
+    minAverage: number;
+    leagueWeeksCompleted: number;
+    tournamentsEntered: number;
+    tournamentsWon: number;
+    minRanking?: number;
+    requiresPro?: boolean;
+  };
+  unlocks: string[];
+  badge: string;
+}
+
+export const CAREER_TIERS: CareerTierDefinition[] = [
+  {
+    id: "amateur",
+    name: "Amateur",
+    description: "Just getting started on the lanes",
+    requirements: { minAverage: 0, leagueWeeksCompleted: 0, tournamentsEntered: 0, tournamentsWon: 0 },
+    unlocks: ["Casual House League", "Local Open tournaments"],
+    badge: "Rookie",
+  },
+  {
+    id: "league-regular",
+    name: "League Regular",
+    description: "A consistent presence at the local lanes",
+    requirements: { minAverage: 130, leagueWeeksCompleted: 5, tournamentsEntered: 1, tournamentsWon: 0 },
+    unlocks: ["Competitive Sport League", "Regional Championships"],
+    badge: "Regular",
+  },
+  {
+    id: "regional-contender",
+    name: "Regional Contender",
+    description: "Making waves in the region",
+    requirements: { minAverage: 160, leagueWeeksCompleted: 15, tournamentsEntered: 5, tournamentsWon: 1 },
+    unlocks: ["Regional sponsor tier", "Sport oil patterns"],
+    badge: "Contender",
+  },
+  {
+    id: "state-champion",
+    name: "State Champion Track",
+    description: "Competing at the state level",
+    requirements: { minAverage: 180, leagueWeeksCompleted: 30, tournamentsEntered: 10, tournamentsWon: 3 },
+    unlocks: ["State-level tournaments", "National sponsors"],
+    badge: "State Star",
+  },
+  {
+    id: "national-circuit",
+    name: "National Circuit",
+    description: "Touring the country and building a name",
+    requirements: { minAverage: 195, leagueWeeksCompleted: 50, tournamentsEntered: 20, tournamentsWon: 5 },
+    unlocks: ["National tournaments", "Pro League access preview"],
+    badge: "National",
+  },
+  {
+    id: "pro-applicant",
+    name: "Pro Applicant",
+    description: "Ready to apply for professional membership",
+    requirements: { minAverage: 200, leagueWeeksCompleted: 60, tournamentsEntered: 25, tournamentsWon: 8, requiresPro: false },
+    unlocks: ["Professional membership application", "Elite sponsors"],
+    badge: "Aspiring Pro",
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    description: "A certified professional bowler",
+    requirements: { minAverage: 200, leagueWeeksCompleted: 0, tournamentsEntered: 0, tournamentsWon: 0, requiresPro: true },
+    unlocks: ["Pro League", "Major Pro tournaments", "Pro Tour rankings"],
+    badge: "Pro",
+  },
+  {
+    id: "elite-tour",
+    name: "Elite Tour",
+    description: "Among the best in the world",
+    requirements: { minAverage: 220, leagueWeeksCompleted: 80, tournamentsEntered: 40, tournamentsWon: 15, requiresPro: true },
+    unlocks: ["Elite Tour events", "Legendary sponsors", "Legacy prestige bonuses"],
+    badge: "Elite",
+  },
+];
+
+export const careerLadderSchema = z.object({
+  currentTier: careerTierSchema,
+  highestTierReached: careerTierSchema,
+  tierUnlockedWeek: z.record(z.string(), z.number()).optional(),
+  leagueWeeksCompleted: z.number(),
+  tournamentsEntered: z.number(),
+  tournamentsWon: z.number(),
+  peakAverage: z.number(),
+});
+
+export type CareerLadder = z.infer<typeof careerLadderSchema>;
+
+// ============================================
+// RANKINGS SYSTEM
+// ============================================
+export const RANKINGS_CONSTANTS = {
+  AI_POOL_SIZE: 150,
+  RANKING_VOLATILITY: 0.15,
+  LEADERBOARD_DISPLAY_SIZE: 10,
+  NEAR_YOU_RANGE: 5,
+  RIVAL_COUNT: 8,
+};
+
+export const rankingRegionSchema = z.enum(["local", "regional", "state", "national", "pro-tour"]);
+export type RankingRegion = z.infer<typeof rankingRegionSchema>;
+
+export const rankedBowlerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  average: z.number(),
+  rank: z.number(),
+  previousRank: z.number(),
+  region: rankingRegionSchema,
+  isRival: z.boolean().optional(),
+  archetype: z.string().optional(),
+});
+
+export type RankedBowler = z.infer<typeof rankedBowlerSchema>;
+
+export const playerRankingSchema = z.object({
+  rank: z.number(),
+  previousRank: z.number(),
+  region: rankingRegionSchema,
+  ratingPoints: z.number(),
+});
+
+export type PlayerRanking = z.infer<typeof playerRankingSchema>;
+
+export const rivalSchema2 = z.object({
+  id: z.string(),
+  name: z.string(),
+  average: z.number(),
+  archetype: z.string(),
+  rank: z.number(),
+  headToHead: z.object({
+    wins: z.number(),
+    losses: z.number(),
+    lastResult: z.enum(["win", "loss", "none"]),
+  }),
+});
+
+export type Rival = z.infer<typeof rivalSchema2>;
+
+export const rankingsSnapshotSchema = z.object({
+  playerRankings: z.array(playerRankingSchema),
+  topBowlers: z.record(z.string(), z.array(rankedBowlerSchema)),
+  rivals: z.array(rivalSchema2),
+  lastUpdatedWeek: z.number(),
+  poolSeed: z.number(),
+});
+
+export type RankingsSnapshot = z.infer<typeof rankingsSnapshotSchema>;
+
+// ============================================
+// SEASONAL STORY BEATS
+// ============================================
+export const storyBeatTypeSchema = z.enum([
+  "pre-season",
+  "mid-season",
+  "post-season",
+  "tier-unlock",
+  "rival-encounter",
+  "breakout",
+  "comeback",
+  "headline-win",
+]);
+
+export type StoryBeatType = z.infer<typeof storyBeatTypeSchema>;
+
+export const storyBeatChoiceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string(),
+  effect: z.object({
+    energy: z.number().optional(),
+    money: z.number().optional(),
+    sponsorRep: z.number().optional(),
+    statBoost: z.string().optional(),
+    statAmount: z.number().optional(),
+  }),
+});
+
+export type StoryBeatChoice = z.infer<typeof storyBeatChoiceSchema>;
+
+export const storyBeatSchema = z.object({
+  id: z.string(),
+  type: storyBeatTypeSchema,
+  title: z.string(),
+  description: z.string(),
+  choices: z.array(storyBeatChoiceSchema).optional(),
+  weekTriggered: z.number(),
+  seasonTriggered: z.number(),
+  resolved: z.boolean(),
+});
+
+export type StoryBeat = z.infer<typeof storyBeatSchema>;
+
+// ============================================
 // GAME HISTORY
 // ============================================
 export const gameResultSchema = z.object({
@@ -1832,6 +2058,13 @@ export const playerProfileSchema = z.object({
   datingState: datingSystemStateSchema.optional(),
   // Owned bowling alley (pro-only, $1M purchase)
   ownedBowlingAlley: ownedBowlingAlleySchema.nullable().optional(),
+  // Career Ladder progression
+  careerLadder: careerLadderSchema.optional(),
+  // Rankings snapshot
+  rankingsSnapshot: rankingsSnapshotSchema.optional(),
+  // Story beats
+  pendingStoryBeat: storyBeatSchema.nullable().optional(),
+  storyBeatHistory: z.array(storyBeatSchema).optional(),
 });
 
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;

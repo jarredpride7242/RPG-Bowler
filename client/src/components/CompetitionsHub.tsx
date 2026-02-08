@@ -54,7 +54,7 @@ interface CompetitionsHubProps {
 }
 
 export function CompetitionsHub({ onPlayLeagueGame, onPlayTournamentGame }: CompetitionsHubProps) {
-  const { currentProfile, updateProfile, spendMoney, useEnergy, addMoney } = useGame();
+  const { currentProfile, updateProfile, spendMoney, useEnergy, addMoney, trackLeagueWeekCompleted, trackTournamentEntered, trackTournamentWon } = useGame();
   const [activeTab, setActiveTab] = useState<"leagues" | "tournaments">("leagues");
   const [viewingLeague, setViewingLeague] = useState<LeagueType | null>(null);
   const [viewingTournament, setViewingTournament] = useState<TournamentTier | null>(null);
@@ -90,6 +90,7 @@ export function CompetitionsHub({ onPlayLeagueGame, onPlayTournamentGame }: Comp
     
     const updatedLeague = simulateLeagueWeek(activeLeague, playerScores);
     
+    trackLeagueWeekCompleted();
     if (updatedLeague.isComplete) {
       const prize = getLeaguePrize(updatedLeague, activeLeague.leagueType);
       addMoney(prize);
@@ -125,6 +126,7 @@ export function CompetitionsHub({ onPlayLeagueGame, onPlayTournamentGame }: Comp
     );
     
     updateProfile({ activeTournament: newTournament });
+    trackTournamentEntered();
     setViewingTournament(null);
   };
   
@@ -137,6 +139,9 @@ export function CompetitionsHub({ onPlayLeagueGame, onPlayTournamentGame }: Comp
     if (updatedTournament.isComplete) {
       const result = createTournamentResult(updatedTournament, currentProfile.currentWeek);
       addMoney(result.prizeMoney);
+      if (result.placement === 1) {
+        trackTournamentWon();
+      }
       
       const history = currentProfile.tournamentHistory || [];
       updateProfile({ 

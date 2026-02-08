@@ -88,6 +88,31 @@ Preferred communication style: Simple, everyday language.
   - Varied names and stats per event
   - Consistent scheduling via stable opponent order
 
+#### Career Ladder System
+- **8 Tiers**: Amateur, League Regular, Regional Contender, State Champion, National Circuit, Pro Applicant, Professional, Elite Tour
+- **Requirements**: Each tier requires minimum bowling average, league weeks completed, tournaments entered/won
+- **Tracking**: League weeks and tournament participation tracked via trackLeagueWeekCompleted/trackTournamentEntered/trackTournamentWon functions
+- **Auto-Advancement**: Career tier computed each week in advanceWeek based on cumulative progress
+- **UI**: CareerLadderPanel.tsx shows current tier, next tier requirements, and all-tier progress list
+
+#### Rankings System
+- **150 AI Bowler Pool**: Generated with seeded RNG across 5 regional divisions (Local, Regional, State, National, Pro Tour)
+- **Weekly Volatility**: Rankings shuffle each week in advanceWeek with performance-based adjustments
+- **Rival Tracking**: Head-to-head records against specific AI bowlers
+- **UI**: RankingsPanel.tsx with regional tabs, leaderboard entries, rank movement indicators, and rival cards
+
+#### Seasonal Story Beats
+- **Trigger Points**: Pre-season (week 1), mid-season (week 10), post-season (week 52)
+- **Player Choices**: Each beat offers 2-3 choices with mechanical effects (energy, money, stat boosts)
+- **Types**: pre-season, mid-season, post-season, tier-unlock, rival-encounter, breakout, comeback, headline-win
+- **UI**: StoryBeatModal.tsx renders as AlertDialog with choice buttons
+
+### Career Screen Tabs (4 total)
+1. Ladder - Career tier display, progress tracking, unlock requirements
+2. Compete - Leagues, tournaments, competitions hub
+3. Rankings - Leaderboards, rival cards, regional divisions
+4. History - Career stats, recent game history
+
 ### Profile Screen Tabs (8 total)
 1. Overview - Player stats and settings
 2. Achievements - Detailed achievement tracking with filters and career records
