@@ -1,0 +1,77 @@
+You are my build and mobile-packaging agent.
+
+I have a Vite + React + TypeScript game project that currently does NOT build cleanly because:
+- Imports are broken (HomeScreen/NewGameSetup/App paths)
+- Files were moved manually
+- Vite entry paths are inconsistent
+- npm run build fails
+- Project structure is messy
+
+My goal:
+Make this project build successfully AND prepare it for Android using Capacitor.
+
+Your tasks:
+
+PART 1 — Fix Project Structure
+1) Inspect the repository and identify frontend files.
+2) Standardize the structure to:
+
+   /client
+     /index.html
+     /src
+       /main.tsx
+       /App.tsx
+       /components
+       /screens
+       /lib
+   /package.json
+   /vite.config.ts
+
+3) Move files if needed, but update all imports so nothing breaks.
+4) Ensure there is exactly ONE correct entry point.
+5) Ensure client/index.html loads src/main.tsx.
+6) Ensure main.tsx renders the correct App component.
+7) Decide the real “home screen” component (NewGameSetup / EventLobby / etc) and wire it as default.
+
+PART 2 — Fix Build System
+8) Fix vite.config so:
+   - root = client
+   - build outputs to dist
+9) Fix package.json scripts so:
+   - npm run dev works
+   - npm run build works
+10) Remove references to missing scripts (server/index.ts, script/build.ts, etc).
+
+PART 3 — Verify
+11) Run:
+    npm install
+    npm run build
+12) Confirm build succeeds and dist/ is generated.
+
+PART 4 — Add Capacitor
+13) Install Capacitor core + cli.
+14) Initialize with:
+    App Name: RPG Bowler
+    App ID: com.jarredpride.rpgbowler
+15) Add Android platform.
+16) Configure capacitor.config to use the Vite build output directory.
+17) Ensure:
+    npx cap sync android works.
+
+PART 5 — Documentation
+18) Explain every structural change you make.
+19) Give me exact commands to:
+    - Open Android Studio
+    - Generate signed AAB
+    - Upload to Google Play.
+
+RULES:
+- Do NOT delete game features.
+- Do NOT remove screens.
+- Only refactor for stability.
+- Preserve saves, gameplay logic, and UI.
+- Prefer fixing paths over rewriting components.
+- Goal is stability + publishability.
+
+Deliverable:
+A project that builds cleanly and can be packaged for Android.
