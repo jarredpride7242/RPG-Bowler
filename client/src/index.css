@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+.safe-area-container {
+  min-height: 100dvh;
+}
+
+body.keyboard-open .fixed.bottom-0 {
+  display: none;
+}
+
+@supports (padding: max(0px)) {
+  .safe-area-top {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+  .safe-area-bottom {
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+}
+
 /* LIGHT MODE - Bowling Game Theme */
 :root {
   --button-outline: rgba(0,0,0, .10);

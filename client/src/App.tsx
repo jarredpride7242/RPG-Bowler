@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,20 +14,36 @@ import { BowlScreen } from "@/components/screens/BowlScreen";
 import { CareerScreen } from "@/components/screens/CareerScreen";
 import { ShopScreen } from "@/components/screens/ShopScreen";
 import { ProfileScreen } from "@/components/screens/ProfileScreen";
+import { setBackButtonHandler } from "@/lib/capacitor";
 
 function GameContent() {
   const { isPlaying, currentSlot } = useGame();
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [newGameSlot, setNewGameSlot] = useState<number | null>(null);
   
-  // Clear newGameSlot when game starts playing
   useEffect(() => {
     if (isPlaying && newGameSlot !== null) {
       setNewGameSlot(null);
     }
   }, [isPlaying, newGameSlot]);
+
+  const handleBackButton = useCallback(() => {
+    if (newGameSlot !== null && !isPlaying) {
+      setNewGameSlot(null);
+      return true;
+    }
+    if (isPlaying && activeTab !== "home") {
+      setActiveTab("home");
+      return true;
+    }
+    return false;
+  }, [newGameSlot, isPlaying, activeTab]);
+
+  useEffect(() => {
+    setBackButtonHandler(handleBackButton);
+    return () => setBackButtonHandler(null);
+  }, [handleBackButton]);
   
-  // Show new game setup if we're creating a new game and not yet playing
   if (newGameSlot !== null && !isPlaying) {
     return (
       <NewGameSetup 
@@ -63,9 +79,9 @@ function GameContent() {
   };
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-area-container">
       <StatusBar />
-      <main className="max-w-2xl mx-auto">
+      <main className="max-w-2xl mx-auto pb-20">
         {renderScreen()}
       </main>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
